@@ -21,6 +21,9 @@ import com.jme3.scene.shape.Box;
  */
 public class PhysicsHelper {
     
+    public static RigidBodyControl stoplichtControl;
+    public static Material stoplichtMaterial;
+    
     public static void createPhysicsWorld(Node rootNode, AssetManager assetManager, PhysicsSpace space) {
         AmbientLight light = new AmbientLight();
         light.setColor(ColorRGBA.LightGray);
@@ -39,20 +42,30 @@ public class PhysicsHelper {
         
         space.add(floorGeometry);
         
-        Material boxMaterial = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
+        stoplichtMaterial = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         
 
         //movable boxes
         for (int i = 0; i < 1; i++) {
             
-            Box box = new Box(0.25f, 0.25f, 0.25f);
-            Geometry boxGeometry = new Geometry("Box", box);
-            boxGeometry.setMaterial(boxMaterial);
-            boxGeometry.setLocalTranslation(11, 11, 54);
+            Box stoplicht = new Box(1,10, 1);
+            Geometry boxGeometry = new Geometry("Stoplicht", stoplicht);
+            boxGeometry.setMaterial(stoplichtMaterial);
+            
+            stoplichtMaterial.setColor("Color", ColorRGBA.Red);
+            boxGeometry.setLocalTranslation(-1.0f,0 , 85);
             //RigidBodyControl automatically uses box collision shapes when attached to single geometry with box mesh
-            boxGeometry.addControl(new RigidBodyControl(2));
+            stoplichtControl = new RigidBodyControl(2);
+            boxGeometry.addControl(stoplichtControl);
+            stoplichtControl.setKinematic(true);
             rootNode.attachChild(boxGeometry);
             space.add(boxGeometry);
         }
     }    
+    public static void stoplichtGroen()
+    {
+        stoplichtControl.setEnabled(false);
+        stoplichtMaterial.setColor("Color", ColorRGBA.Green);
+    }
+    
 }

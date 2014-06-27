@@ -132,8 +132,8 @@ public class Car {
 
             //motionControl.setInitialDuration(20f);
 
-            //motionControl.setSpeed(3);
-            motionControl.setSpeed(1 + (int) (Math.random() * ((4 - 1) + 1)));
+            motionControl.setSpeed(1);
+            //motionControl.setSpeed(1 + (int) (Math.random() * ((4 - 1) + 1)));
             motionControl.play();
             isMoving = true;
 

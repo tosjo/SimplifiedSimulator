@@ -93,6 +93,7 @@ public class SimplifiedSimulator extends SimpleApplication implements ActionList
             if (isPressed) {
                 for (Car car : CarList) {
                     car.tryContinue();
+                    PhysicsHelper.stoplichtGroen();
                 }
             }
 

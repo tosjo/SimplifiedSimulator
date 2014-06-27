@@ -22,6 +22,7 @@ public class MyCustomControl extends RigidBodyControl implements PhysicsCollisio
     Node rootNode;
     String collisionString;
     Car car;
+    int counter=0;
 
     public void collision(PhysicsCollisionEvent event) {
         try {
@@ -35,8 +36,27 @@ public class MyCustomControl extends RigidBodyControl implements PhysicsCollisio
                         String nodeString = event.getNodeA().getName().substring(11);
                         int nodeId = Integer.parseInt(nodeString);
                         System.out.println("node id is " + nodeId + "en car id is " + car.id);
+                        System.out.println("Number is collisions = " +counter);
+                        counter++;
                         if (nodeId == car.id) {
                             car.stop();
+                        }
+                        String nodeString2 = event.getNodeB().getName().substring(11);
+                        int nodeId2 = Integer.parseInt(nodeString2);
+                        System.out.println("node id is " + nodeId2 + "en car id is " + car.id);
+                        if (nodeId == car.id) {
+                            car.stop();                            
+                        }
+                    }
+                    else if(event.getNodeA().getName().contains("vehicleNode") && event.getNodeB().getName().contains("Stoplicht"))
+                    {
+                        System.out.println("STOPLICHT BEREIKT");
+                        String nodeString = event.getNodeA().getName().substring(11);
+                        int nodeId = Integer.parseInt(nodeString);
+                        if (nodeId == car.id) {
+                            car.stop();
+
+                        counter++;
                         }
                     }
                 }
