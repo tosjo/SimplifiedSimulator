@@ -22,6 +22,7 @@ public class SimplifiedSimulator extends SimpleApplication implements ActionList
     private Vector3f camStartLocation = new Vector3f(-100, 100, 100);
     public List<Car> CarList = new ArrayList<Car>();
     int carCounter = 0;
+    public WaypointLoader waypointLoader;// = new WaypointLoader("waypoints.txt");
 
     public static void main(String[] args) {
         SimplifiedSimulator app = new SimplifiedSimulator();
@@ -45,11 +46,16 @@ public class SimplifiedSimulator extends SimpleApplication implements ActionList
         cam.setLocation(camStartLocation);
         cam.lookAt(new Vector3f(0, 0, 0), new Vector3f(0, 0, 0));
 
-       
-        
+        waypointLoader = new WaypointLoader("waypoints\\waypoints");
+        waypointLoader.LoadRoadpaths();
+        System.out.println("loaded paths");
+
+
+
+
         //creating the world
         PhysicsHelper.createPhysicsWorld(rootNode, assetManager, bulletAppState.getPhysicsSpace());
-        
+
     }
 
     @Override
@@ -63,19 +69,29 @@ public class SimplifiedSimulator extends SimpleApplication implements ActionList
     }
 
     public void createCar() {
-        Car car = new Car(rootNode, 14, 6, carCounter, assetManager, bulletAppState);
-        carCounter++;
-        Car car2 = new Car(rootNode, 16, 13, carCounter, assetManager, bulletAppState);
-        CarList.add(car);
-        CarList.add(car2);
-        carCounter++;
+
+        RoadPath path1 = waypointLoader.GetRoadPath(14, 6);
+        if (path1 != null) {
+            Car car = new Car(rootNode, path1, carCounter, assetManager, bulletAppState);
+            carCounter++;
+            CarList.add(car);
+        }
         
+        RoadPath path2 = waypointLoader.GetRoadPath(16, 13);
+        if (path2 != null) {
+            Car car2 = new Car(rootNode, path2, carCounter, assetManager, bulletAppState);
+            carCounter++;
+            CarList.add(car2);            
+        }
+        
+        
+
     }
 
     private void setUpKeys() {
         inputManager.addMapping("Start", new KeyTrigger(KeyInput.KEY_SPACE));
         inputManager.addListener(this, "Start");
-        
+
         inputManager.addMapping("Continue", new KeyTrigger(KeyInput.KEY_F));
         inputManager.addListener(this, "Continue");
     }

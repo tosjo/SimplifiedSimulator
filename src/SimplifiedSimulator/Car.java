@@ -25,6 +25,7 @@ import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.shape.Box;
+import java.io.Console;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.util.Scanner;
@@ -45,6 +46,7 @@ public class Car {
     BulletAppState bulletAppState;
     AssetManager assetManager;
     public MotionPath path = new MotionPath();
+    public RoadPath roadPath;
     public boolean pathLoaded = false;
     String generatedfilename;
     RigidBodyControl car_phys;
@@ -60,17 +62,21 @@ public class Car {
     private Geometry detecionSpatial;
     private final Geometry detecionGeometry;
 
-    public Car(Node rootNode, int startPoint, int endpoint, int id, AssetManager assetManager, BulletAppState bulletAppState) {
-        this.startPoint = startPoint;
-        this.endPoint = endpoint;
+    public Car(Node rootNode, RoadPath roadpath, int id, AssetManager assetManager, BulletAppState bulletAppState) {
+        //this.startPoint = startPoint;
+        //this.endPoint = endpoint;
         this.id = id;
         this.bulletAppState = bulletAppState;
         this.rootNode = rootNode;
         this.assetManager = assetManager;
         space = bulletAppState.getPhysicsSpace();
 
-        generatedfilename = "waypoints\\waypoints" + startPoint + "-" + endPoint + ".txt";
-//        car_phys= new RigidBodyControl(1.0f ); // dynamic
+        this.roadPath = roadpath;
+        LoadRoad();
+
+        //generatedfilename = "waypoints\\waypoints" + startPoint + "-" + endPoint + ".txt";
+        //System.out.println(generatedfilename);
+        car_phys = new RigidBodyControl(1.0f); // dynamic
         Material carMaterial = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         //carMaterial.getAdditionalRenderState().setWireframe(true);
         carMaterial.setColor("Color", ColorRGBA.Blue);
@@ -81,30 +87,30 @@ public class Car {
         Material mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         //mat.getAdditionalRenderState().setWireframe(true);
         mat.setColor("Color", ColorRGBA.Red);
-        MyCustomControl carControl = new MyCustomControl(bulletAppState, rootNode, this);
+        MyCustomControl CarControl = new MyCustomControl(bulletAppState, rootNode, this);
         CompoundCollisionShape compoundShape = new CompoundCollisionShape();
         BoxCollisionShape box = new BoxCollisionShape(new Vector3f(1f, 1f, 2f));
         compoundShape.addChildShape(box, new Vector3f(0, 1, 0));
-        
-       //creating detection spatial
+
+        //creating detection spatial
         Material detectionMaterial = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         //carMaterial.getAdditionalRenderState().setWireframe(true);
         detectionMaterial.setColor("Color", ColorRGBA.Blue);
         Box detection = new Box(0.5f, 1f, 3f);
         detecionGeometry = new Geometry("Detection" + id, detection);
         detecionGeometry.setMaterial(detectionMaterial);
-        
+
         detectionMaterial.setColor("Color", ColorRGBA.Red);
         BoxCollisionShape detectionShape = new BoxCollisionShape(new Vector3f(0.5f, 0.5f, 1f));
         compoundShape.addChildShape(detectionShape, new Vector3f(1, 0, 0));
-        
 
-        vehicleNode = new Node("vehicleNode" + id);    
+
+        vehicleNode = new Node("vehicleNode" + id);
         vehicleNode.attachChild(detecionGeometry);
         vehicleNode.attachChild(carGeometry);
-        vehicleNode.addControl(carControl);
-        carControl.setKinematic(true);
-        carControl.setMass(1f);
+        vehicleNode.addControl(CarControl);
+        CarControl.setKinematic(true);
+        CarControl.setMass(1f);
 
 
         //carGeometry.setLocalTranslation(0, 15, 5);
@@ -115,9 +121,13 @@ public class Car {
         //carControl.setApplyPhysicsLocal(true);
         //carGeometry.addControl(carControl);
         //rootNode.attachChild(carGeometry);
-        space.add(carControl);
+        space.add(CarControl);
         rootNode.attachChild(vehicleNode);
-        loadWaypoints();
+        //loadWaypoints();
+
+        System.out.println(this.roadPath.ToString());
+
+        setPath();
 
 
     }
@@ -144,7 +154,7 @@ public class Car {
             this.getPath(id).addListener(new MotionPathListener() {
                 public void onWayPointReach(MotionEvent control, int wayPointIndex) {
                     if (path.getNbWayPoints() == wayPointIndex + 1) {
-                        delete();                        
+                        delete();
                     } else {
                         System.out.println(control.getSpatial().getName() + " has reached way point " + wayPointIndex);
                     }
@@ -169,34 +179,9 @@ public class Car {
 
     }
 
-    public void loadWaypoints() {
-        pathLoaded = false;
-        float x = 0;
-        float y = 0;
-        float z = 0;
-        try {
-            Scanner in = new Scanner(new FileReader(generatedfilename));
-            waypointsFromFile = in.nextLine();
-            correctWPFromFile = waypointsFromFile.replace("(", "");
-            correctWPFromFile2 = correctWPFromFile.replace(" ", "");
-            String formattedWayPoints[] = correctWPFromFile2.split("\\)");
-            for (int i = 0; i < formattedWayPoints.length; i++) {
-                String[] vectorWP = formattedWayPoints[i].split(",");
-                x = Float.valueOf(vectorWP[0]);
-                y = Float.valueOf(vectorWP[1]);
-                z = Float.valueOf(vectorWP[2]);
-                //System.out.println("dit zijn xyz"+x + y + z);
-                Vector3f test = new Vector3f(x, y, z);
-                addWayPoint(test);
-                pathLoaded = true;
-
-            }
-            setPath();
-
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(SimplifiedSimulator.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
+    final public void LoadRoad() {
+        path = roadPath.path;
+        pathLoaded = true;               
     }
 
     private void addWayPoint(Vector3f waypointLocation) {
@@ -207,7 +192,7 @@ public class Car {
     }
 
     public void delete() {
-        
+
         vehicleNode.detachAllChildren();
         rootNode.detachChild(vehicleNode);
         bulletAppState.getPhysicsSpace().remove(vehicleNode);
@@ -221,16 +206,13 @@ public class Car {
         isMoving = false;
         carControl.setKinematic(true);
     }
-    
-    public void tryContinue()
-    {
+
+    public void tryContinue() {
         motionControl.play();
         isMoving = true;
-        if(carControl!=null)
-        {
-        carControl.setKinematic(false);
-        System.out.println(id+ "is vrijgegeven");
+        if (carControl != null) {
+            carControl.setKinematic(false);
+            System.out.println(id + "is vrijgegeven");
         }
     }
-    
 }
