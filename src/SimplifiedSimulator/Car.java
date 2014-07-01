@@ -25,6 +25,7 @@ import com.jme3.material.Material;
 import com.jme3.math.ColorRGBA;
 import com.jme3.math.FastMath;
 import com.jme3.math.Quaternion;
+import com.jme3.math.Spline.SplineType;
 import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
@@ -160,7 +161,9 @@ public class Car {
 
             //motionControl.setInitialDuration(20f);
 
-            motionControl.setSpeed(1);
+
+            path.setPathSplineType(SplineType.Linear);
+            motionControl.setSpeed(0.5f);
             //motionControl.setSpeed(1 + (int) (Math.random() * ((4 - 1) + 1)));
             motionControl.play();
             isMoving = true;
