@@ -22,14 +22,18 @@ public class WaypointLoader {
     }
 
     public void NewRoadPath(int StartPoint, int Endpoint) {
-        RoadPath path = new RoadPath(StartPoint, Endpoint, filePath);
+        
+        if(!roadExists(StartPoint, Endpoint)){
+                RoadPath path = new RoadPath(StartPoint, Endpoint, filePath);
+                paths.add(path);
+        }
 
-        paths.add(path);
+       
     }
 
     public void LoadRoadpaths() {
-        NewRoadPath(14, 6);
-        NewRoadPath(16, 13);
+        //NewRoadPath(14, 6);
+        //NewRoadPath(16, 13);
     }
 
     public RoadPath GetRoadPath(int start, int end) {

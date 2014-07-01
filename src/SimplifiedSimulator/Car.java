@@ -5,10 +5,13 @@
 package SimplifiedSimulator;
 
 import com.bulletphysics.collision.shapes.CollisionShape;
+import com.bulletphysics.dynamics.RigidBody;
 import com.bulletphysics.linearmath.MotionState;
 import com.jme3.asset.AssetManager;
+import com.jme3.bounding.BoundingVolume;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.PhysicsSpace;
+import com.jme3.bullet.collision.PhysicsCollisionObject;
 import com.jme3.bullet.collision.shapes.BoxCollisionShape;
 import com.jme3.bullet.collision.shapes.CompoundCollisionShape;
 import com.jme3.bullet.control.GhostControl;
@@ -17,6 +20,7 @@ import com.jme3.bullet.control.VehicleControl;
 import com.jme3.cinematic.MotionPath;
 import com.jme3.cinematic.MotionPathListener;
 import com.jme3.cinematic.events.MotionEvent;
+import com.jme3.collision.CollisionResults;
 import com.jme3.material.Material;
 import com.jme3.math.ColorRGBA;
 import com.jme3.math.FastMath;
@@ -24,6 +28,7 @@ import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
+import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
 import java.io.Console;
 import java.io.FileNotFoundException;
@@ -48,20 +53,24 @@ public class Car {
     public MotionPath path = new MotionPath();
     public RoadPath roadPath;
     public boolean pathLoaded = false;
+    private boolean DetectLight = true;
     String generatedfilename;
-    RigidBodyControl car_phys;
-    VehicleControl carControl;
+    //RigidBodyControl car_phys;
+    //VehicleControl carControl;
     Node vehicleNode;
     private Vector3f flatLocation;
-    private String waypointsFromFile;
-    private String correctWPFromFile;
-    private String correctWPFromFile2;
+    //private String waypointsFromFile;
+    //private String correctWPFromFile;
+    //private String correctWPFromFile2;
     private MotionEvent motionControl;
     PhysicsSpace space;
     public boolean isMoving;
     private Geometry detecionSpatial;
     private final Geometry detecionGeometry;
+    
+    boolean canContinue;
 
+    //private Boolean IsMBoolean
     public Car(Node rootNode, RoadPath roadpath, int id, AssetManager assetManager, BulletAppState bulletAppState) {
         //this.startPoint = startPoint;
         //this.endPoint = endpoint;
@@ -76,7 +85,7 @@ public class Car {
 
         //generatedfilename = "waypoints\\waypoints" + startPoint + "-" + endPoint + ".txt";
         //System.out.println(generatedfilename);
-        car_phys = new RigidBodyControl(1.0f); // dynamic
+        //car_phys = new RigidBodyControl(1.0f); // dynamic
         Material carMaterial = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         //carMaterial.getAdditionalRenderState().setWireframe(true);
         carMaterial.setColor("Color", ColorRGBA.Blue);
@@ -106,11 +115,11 @@ public class Car {
 
 
         vehicleNode = new Node("vehicleNode" + id);
-        vehicleNode.attachChild(detecionGeometry);
+        //vehicleNode.attachChild(detecionGeometry);
         vehicleNode.attachChild(carGeometry);
-        vehicleNode.addControl(CarControl);
-        CarControl.setKinematic(true);
-        CarControl.setMass(1f);
+        //vehicleNode.addControl(CarControl);
+        //CarControl.setKinematic(true);
+        //CarControl.setMass(1f);
 
 
         //carGeometry.setLocalTranslation(0, 15, 5);
@@ -121,15 +130,23 @@ public class Car {
         //carControl.setApplyPhysicsLocal(true);
         //carGeometry.addControl(carControl);
         //rootNode.attachChild(carGeometry);
-        space.add(CarControl);
+        //space.add(CarControl);
         rootNode.attachChild(vehicleNode);
         //loadWaypoints();
 
         System.out.println(this.roadPath.ToString());
 
+        SetCollisionGroup();
         setPath();
 
 
+    }
+
+    public void SetCollisionGroup() {
+        //if (rootNode != null) {
+        //car_phys.setCollisionGroup(PhysicsCollisionObject.COLLISION_GROUP_02);
+        //car_phys.setCollideWithGroups(PhysicsCollisionObject.COLLISION_GROUP_02);
+        //}
     }
 
     public void setPath() {
@@ -139,6 +156,7 @@ public class Car {
             motionControl = new MotionEvent(vehicleNode, this.getPath(id));
             motionControl.setDirectionType(MotionEvent.Direction.PathAndRotation);
             motionControl.setRotation(new Quaternion().fromAngleNormalAxis(-FastMath.PI, Vector3f.UNIT_Y));
+            path.setCurveTension(0f);
 
             //motionControl.setInitialDuration(20f);
 
@@ -154,9 +172,12 @@ public class Car {
             this.getPath(id).addListener(new MotionPathListener() {
                 public void onWayPointReach(MotionEvent control, int wayPointIndex) {
                     if (path.getNbWayPoints() == wayPointIndex + 1) {
-                        delete();
+                        if (Car.this.id == Integer.parseInt(control.getSpatial().getName().substring(11))) {
+                            delete();
+                        }
+
                     } else {
-                        System.out.println(control.getSpatial().getName() + " has reached way point " + wayPointIndex);
+                        //System.out.println(control.getSpatial().getName() + " has reached way point " + wayPointIndex);
                     }
                 }
             });
@@ -181,7 +202,7 @@ public class Car {
 
     final public void LoadRoad() {
         path = roadPath.path;
-        pathLoaded = true;               
+        pathLoaded = true;
     }
 
     private void addWayPoint(Vector3f waypointLocation) {
@@ -195,24 +216,77 @@ public class Car {
 
         vehicleNode.detachAllChildren();
         rootNode.detachChild(vehicleNode);
-        bulletAppState.getPhysicsSpace().remove(vehicleNode);
+        //bulletAppState.getPhysicsSpace().remove(vehicleNode);
         System.out.println("CAR" + id + " DELETED");
         carGeometry.removeFromParent();
         motionControl.dispose();
+        SimplifiedSimulator.getInstance().RemoveCar(this);
+
     }
 
     public void stop() {
         motionControl.pause();
         isMoving = false;
-        carControl.setKinematic(true);
+        //carControl.setKinematic(true);
     }
 
     public void tryContinue() {
+        if(canContinue == true){
         motionControl.play();
         isMoving = true;
-        if (carControl != null) {
-            carControl.setKinematic(false);
-            System.out.println(id + "is vrijgegeven");
+        }
+        //if (carControl != null) {
+        //   carControl.setKinematic(false);
+        //   System.out.println(id + "is vrijgegeven");
+        //}
+    }
+
+    public void GetCollisionCar(Car car) {
+        if (isMoving) {
+            CollisionResults results = new CollisionResults();
+            BoundingVolume bv = carGeometry.getWorldBound();
+            car.carGeometry.collideWith(bv, results);
+
+            if (results.size() > 0 && results.size() < 10) {
+                System.out.println("Car: " + this.id + " Collision Results: " + results.size() + " with car: " + car.id);
+                //this.stop
+                SimplifiedSimulator.getInstance().StopCar(this);
+            } else {
+                //System.out.println("No collisons");
+            }
+        }
+    }
+
+    public void GetCollisionLight(TrafficLight tl) {
+        SetDetect(tl);
+        if (DetectLight) {
+            CollisionResults results = new CollisionResults();
+            BoundingVolume bv = carGeometry.getWorldBound();
+            tl.lightGeometry.collideWith(bv, results);
+            
+
+            if (results.size() > 0) {
+                //System.out.println("Car: " + this.id + " Collision Results: " + results.size() + " with Light: " + tl.ID);
+                this.stop();
+                canContinue = false;
+                //SimplifiedSimulator.getInstance().StopCar(car);
+            } else {
+                //System.out.println("No collisons");
+            }
+        }
+
+    }
+    
+    public void SetDetect(TrafficLight tl)
+    {
+        if(tl.GetState() == TrafficLight.States.Green)
+        {
+            DetectLight = false;
+            canContinue = true;
+        }
+        else
+        {
+            DetectLight = true;            
         }
     }
 }

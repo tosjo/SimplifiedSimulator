@@ -48,7 +48,7 @@ public class RoadPath {
             String formattedWayPoints[] = correctWPFromFile2.split("\\)");
             for (int i = 0; i < formattedWayPoints.length; i++) {
                 String[] vectorWP = formattedWayPoints[i].split(",");
-                x = Float.valueOf(vectorWP[0]);
+                  x = Float.valueOf(vectorWP[0]);
                 y = Float.valueOf(vectorWP[1]);
                 z = Float.valueOf(vectorWP[2]);
                 //System.out.println("dit zijn xyz"+x + y + z);
@@ -67,7 +67,7 @@ public class RoadPath {
     
     private void addWayPoint(Vector3f waypointLocation) {
         Vector3f flatLocation = waypointLocation;
-        flatLocation.y = 1f;
+        flatLocation.y = 1.5f;
 
         path.addWayPoint(flatLocation);
     }

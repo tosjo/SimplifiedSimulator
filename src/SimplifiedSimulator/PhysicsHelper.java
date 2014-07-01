@@ -21,8 +21,8 @@ import com.jme3.scene.shape.Box;
  */
 public class PhysicsHelper {
     
-    public static RigidBodyControl stoplichtControl;
-    public static Material stoplichtMaterial;
+    //public static RigidBodyControl stoplichtControl;
+    //public static Material stoplichtMaterial;
     
     public static void createPhysicsWorld(Node rootNode, AssetManager assetManager, PhysicsSpace space) {
         AmbientLight light = new AmbientLight();
@@ -42,30 +42,31 @@ public class PhysicsHelper {
         
         space.add(floorGeometry);
         
-        stoplichtMaterial = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
+        //stoplichtMaterial = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         
 
         //movable boxes
-        for (int i = 0; i < 1; i++) {
+        //for (int i = 0; i < 1; i++) {
             
-            Box stoplicht = new Box(1,10, 1);
-            Geometry boxGeometry = new Geometry("Stoplicht", stoplicht);
-            boxGeometry.setMaterial(stoplichtMaterial);
+         //   Box stoplicht = new Box(1,5, 1);
+         //   Geometry boxGeometry = new Geometry("Stoplicht", stoplicht);
+         //   boxGeometry.setMaterial(stoplichtMaterial);
             
-            stoplichtMaterial.setColor("Color", ColorRGBA.Red);
-            boxGeometry.setLocalTranslation(-1.0f,0 , 85);
+         //   stoplichtMaterial.setColor("Color", ColorRGBA.Red);
+          //  boxGeometry.setLocalTranslation(-1.0f,6 , 85);
             //RigidBodyControl automatically uses box collision shapes when attached to single geometry with box mesh
-            stoplichtControl = new RigidBodyControl(2);
-            boxGeometry.addControl(stoplichtControl);
-            stoplichtControl.setKinematic(true);
-            rootNode.attachChild(boxGeometry);
-            space.add(boxGeometry);
+         //   stoplichtControl = new RigidBodyControl(2);
+            
+         //   boxGeometry.addControl(stoplichtControl);
+          //  stoplichtControl.setKinematic(true);
+         //   rootNode.attachChild(boxGeometry);
+         //   space.add(boxGeometry);
         }
-    }    
-    public static void stoplichtGroen()
-    {
-        stoplichtControl.setEnabled(false);
-        stoplichtMaterial.setColor("Color", ColorRGBA.Green);
-    }
+    
+   // public static void stoplichtGroen()
+    //{
+    //    stoplichtControl.setEnabled(false);
+   //     stoplichtMaterial.setColor("Color", ColorRGBA.Green);
+   // }
     
 }
