@@ -4,19 +4,12 @@
  */
 package SimplifiedSimulator;
 
-import com.bulletphysics.collision.shapes.CollisionShape;
-import com.bulletphysics.dynamics.RigidBody;
-import com.bulletphysics.linearmath.MotionState;
 import com.jme3.asset.AssetManager;
 import com.jme3.bounding.BoundingVolume;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.PhysicsSpace;
-import com.jme3.bullet.collision.PhysicsCollisionObject;
 import com.jme3.bullet.collision.shapes.BoxCollisionShape;
 import com.jme3.bullet.collision.shapes.CompoundCollisionShape;
-import com.jme3.bullet.control.GhostControl;
-import com.jme3.bullet.control.RigidBodyControl;
-import com.jme3.bullet.control.VehicleControl;
 import com.jme3.cinematic.MotionPath;
 import com.jme3.cinematic.MotionPathListener;
 import com.jme3.cinematic.events.MotionEvent;
@@ -29,14 +22,8 @@ import com.jme3.math.Spline.SplineType;
 import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
-import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
-import java.io.Console;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.util.Scanner;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import com.jme3.terrain.noise.Color;
 
 /**
  *
@@ -72,7 +59,7 @@ public class Car {
     boolean canContinue;
 
     //private Boolean IsMBoolean
-    public Car(Node rootNode, RoadPath roadpath, int id, AssetManager assetManager, BulletAppState bulletAppState) {
+    public Car(Node rootNode, RoadPath roadpath, int id, AssetManager assetManager, BulletAppState bulletAppState, ColorRGBA color) {
         //this.startPoint = startPoint;
         //this.endPoint = endpoint;
         this.id = id;
@@ -89,7 +76,7 @@ public class Car {
         //car_phys = new RigidBodyControl(1.0f); // dynamic
         Material carMaterial = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         //carMaterial.getAdditionalRenderState().setWireframe(true);
-        carMaterial.setColor("Color", ColorRGBA.Blue);
+        carMaterial.setColor("Color", color);
         Box car = new Box(1f, 1f, 2f);
         carGeometry = new Geometry("Car" + id, car);
         carGeometry.setMaterial(carMaterial);
@@ -169,7 +156,7 @@ public class Car {
             isMoving = true;
 
 
-            path.enableDebugShape(assetManager, rootNode);
+            //path.enableDebugShape(assetManager, rootNode);
 
 
             this.getPath(id).addListener(new MotionPathListener() {

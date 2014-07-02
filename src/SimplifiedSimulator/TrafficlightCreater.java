@@ -31,8 +31,28 @@ public class TrafficlightCreater {
         SimplifiedSimulator.getInstance().CreateTrafficLight(12, -126.0f, -12.4f);
         SimplifiedSimulator.getInstance().CreateTrafficLight(13, -124.8f, -30.7f);
         SimplifiedSimulator.getInstance().CreateTrafficLight(14, -126.2f, -48.8f);
-        SimplifiedSimulator.getInstance().CreateTrafficLight(15, -73.7f, -173.6f);
-        //SimplifiedSimulator.getInstance().CreateTrafficLight(16, -12.0f, 82.8f);
+        SimplifiedSimulator.getInstance().CreateTrafficLight(15, -72.5f, 169.5f);
+        SimplifiedSimulator.getInstance().CreateTrafficLight(21, -92.1f, -114.3f);
+        SimplifiedSimulator.getInstance().CreateTrafficLight(22, 69.0f, -94.9f);
+        SimplifiedSimulator.getInstance().CreateTrafficLight(23, 63.3f, 75.4f);
+        SimplifiedSimulator.getInstance().CreateTrafficLight(24, 4.0f, 100.7f);
+        SimplifiedSimulator.getInstance().CreateTrafficLight(25, -62.7f, 90.3f);
+        //SimplifiedSimulator.getInstance().CreateTrafficLight(31, -102.0f, -54.0f);
+        //SimplifiedSimulator.getInstance().CreateTrafficLight(32, -113.0f, 46.6f);
+        //SimplifiedSimulator.getInstance().CreateTrafficLight(33, 58.1f, 8.23f);
+        //SimplifiedSimulator.getInstance().CreateTrafficLight(34, 51.7f, 79.1f);
+        //SimplifiedSimulator.getInstance().CreateTrafficLight(35, 66.2f, 1.9f);
+        //SimplifiedSimulator.getInstance().CreateTrafficLight(36, 76.2f, -96.9f);
+        //SimplifiedSimulator.getInstance().CreateTrafficLight(37, -32.5f, 91.2f);
+        //SimplifiedSimulator.getInstance().CreateTrafficLight(38, -61.4f, 81.7f);
+        //SimplifiedSimulator.getInstance().CreateTrafficLight(39, -33.6f, 99.2f);
+        //SimplifiedSimulator.getInstance().CreateTrafficLight(40, 4.1f, 111.1f);
+        //SimplifiedSimulator.getInstance().CreateTrafficLight(41, -88.6f, -60.5f);
+        //SimplifiedSimulator.getInstance().CreateTrafficLight(42, -81.7f, -116.4f);
+        SimplifiedSimulator.getInstance().CreateTrafficLight(51, 100.56f, -88.64f);
+        SimplifiedSimulator.getInstance().CreateTrafficLight(52, 123.6f, -74.70f);
+        SimplifiedSimulator.getInstance().CreateTrafficLight(53, -114.0f, 32.5f);
+        
         
         
         

@@ -6,6 +6,7 @@ import com.jme3.bullet.BulletAppState;
 import com.jme3.input.KeyInput;
 import com.jme3.input.controls.ActionListener;
 import com.jme3.input.controls.KeyTrigger;
+import com.jme3.math.ColorRGBA;
 import com.jme3.math.Vector3f;
 import com.jme3.renderer.RenderManager;
 import java.net.URL;
@@ -22,7 +23,7 @@ public class SimplifiedSimulator extends SimpleApplication implements ActionList
      * Variables
      */
     int PORT = 1337;
-    String HOSTNAME = "141.252.228.41";
+    String HOSTNAME = "141.252.228.33";
     private static SimplifiedSimulator _instance = null;
     private BulletAppState bulletAppState;
     private Vector3f camStartLocation = new Vector3f(-100, 100, 100);
@@ -73,7 +74,7 @@ public class SimplifiedSimulator extends SimpleApplication implements ActionList
         waypointLoader.LoadRoadpaths();
         System.out.println("loaded paths");
 
-        bulletAppState.getPhysicsSpace().enableDebug(assetManager);
+        //bulletAppState.getPhysicsSpace().enableDebug(assetManager);
 
         //creating the world
         PhysicsHelper.createPhysicsWorld(rootNode, assetManager, bulletAppState.getPhysicsSpace());
@@ -167,7 +168,7 @@ public class SimplifiedSimulator extends SimpleApplication implements ActionList
         for (SimulationEvent sime : events) {
             if (sime.time == i) {
                 //SendMessage(CreateMessage(sime.startPoint));
-                createCar(sime.startPoint, sime.endPoint);                
+                createCar(sime.startPoint, sime.endPoint, sime.type);                
             }
         }
     }
@@ -276,12 +277,27 @@ public void SetLightState(TrafficLight tl, int state){
         //TODO: add render code
     }
 
-    public void createCar(int start, int end) {
+    public void createCar(int start, int end, int type) {
 
+        ColorRGBA color;
+        
+        switch(type)
+        {
+            case 0: color = ColorRGBA.Blue;
+                    break;
+            case 1: color = ColorRGBA.Red;
+                break;
+            case 2: color = ColorRGBA.Green;
+                break;
+            case 3: color = ColorRGBA.Yellow;
+                break;
+            default: color = ColorRGBA.Black;
+                break;
+        }
         waypointLoader.NewRoadPath(start, end);
         RoadPath path1 = waypointLoader.GetRoadPath(start, end);
-        if (path1 != null) {
-            Car car = new Car(rootNode, path1, carCounter, assetManager, bulletAppState);
+        if (path1 != null && type != 1) {
+            Car car = new Car(rootNode, path1, carCounter, assetManager, bulletAppState,color);
             carCounter++;
             CarList.add(car);
         }
@@ -328,7 +344,7 @@ public void SetLightState(TrafficLight tl, int state){
     public void onAction(String binding, boolean isPressed, float tpf) {
         if (binding.equals("Start")) {
             if (isPressed) {
-                createCar(14,6);
+                //createCar(14,6);
                 if(!clientstarted)
                 {
                 StartReceiver();
