@@ -7,7 +7,7 @@ package simplifiedsimulator.render;
 public enum RenderQuality {
     HIGH(4096, 4, true, true, true, 2),
     MEDIUM(2048, 3, false, true, true, 2),
-    LOW(1024, 2, false, false, false, 1);
+    LOW(2048, 2, false, false, false, 1);
 
     private final int shadowMapSize;
     private final int shadowSplits;
