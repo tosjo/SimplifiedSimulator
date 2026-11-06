@@ -25,18 +25,31 @@ public record Route(String id, Set<Mode> modes, List<Lane> lanes, SignalGroup gr
         lanes = List.copyOf(lanes);
     }
 
+    /**
+     * Where the route joins lane {@code index}, measured along that lane. Paths across the
+     * crossing often join an exit lane part-way along it, after the point where other routes
+     * have already joined; the first lane is always entered at its start.
+     */
+    public double entryOffset(int index) {
+        if (index == 0) {
+            return 0;
+        }
+        return lanes.get(index).path().project(lanes.get(index - 1).path().end());
+    }
+
     /** Distance along the whole route at which a lane starts. */
     public double laneStart(int index) {
         double s = 0;
         for (int i = 0; i < index; i++) {
-            s += lanes.get(i).length();
+            s += lanes.get(i).length() - entryOffset(i);
         }
         return s;
     }
 
     /** Position of the stop line measured along the whole route. */
     public double stopLineDistance() {
-        return laneStart(lanes.indexOf(stopLane)) + stopS;
+        int index = lanes.indexOf(stopLane);
+        return laneStart(index) + stopS - entryOffset(index);
     }
 
     public double length() {
@@ -46,14 +59,26 @@ public record Route(String id, Set<Mode> modes, List<Lane> lanes, SignalGroup gr
     /** The whole route as one polyline. */
     public Polyline path() {
         List<Vec2> pts = new ArrayList<>();
-        for (Lane lane : lanes) {
-            for (Vec2 p : lane.path().points()) {
-                if (pts.isEmpty() || pts.get(pts.size() - 1).distance(p) > 0.05) {
-                    pts.add(p);
+        for (int i = 0; i < lanes.size(); i++) {
+            Polyline lanePath = lanes.get(i).path();
+            double entry = entryOffset(i);
+            List<Vec2> lanePoints = lanePath.points();
+            add(pts, lanePath.pointAt(entry));
+            double s = 0;
+            for (int k = 1; k < lanePoints.size(); k++) {
+                s += lanePoints.get(k).distance(lanePoints.get(k - 1));
+                if (s > entry) {
+                    add(pts, lanePoints.get(k));
                 }
             }
         }
         return new Polyline(pts);
+    }
+
+    private static void add(List<Vec2> pts, Vec2 p) {
+        if (pts.isEmpty() || pts.get(pts.size() - 1).distance(p) > 0.05) {
+            pts.add(p);
+        }
     }
 
     /** Approach id ({@code N}, {@code E}, {@code S}, {@code W}) this route starts from. */
