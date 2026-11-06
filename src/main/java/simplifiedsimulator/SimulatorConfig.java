@@ -3,6 +3,8 @@ package simplifiedsimulator;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import simplifiedsimulator.control.SignalControllers;
@@ -27,6 +29,7 @@ import simplifiedsimulator.render.RenderQuality;
  * @param csv         write statistics to this file (headless mode), or {@code null}
  * @param camera      initial camera viewpoint
  * @param screenshot  save a screenshot to this file after {@code duration} seconds and exit, or {@code null}
+ * @param duel        two controllers to show side by side, or an empty list for the normal single view
  */
 public record SimulatorConfig(
         String controller,
@@ -43,7 +46,8 @@ public record SimulatorConfig(
         double duration,
         Path csv,
         CameraRig.Preset camera,
-        Path screenshot) {
+        Path screenshot,
+        List<String> duel) {
 
     public static final String DEFAULT_HOST = "localhost";
     public static final int DEFAULT_PORT = 1337;
@@ -58,6 +62,8 @@ public record SimulatorConfig(
               --scale <factor>     multiply all traffic volumes (default 1)
               --demand <file.csv>  traffic volumes per route (default: built-in estimates)
               --seed <number>      random seed; the same seed gives the same traffic (default 1)
+              --duel <a>,<b>       two controllers side by side on the same traffic,
+                                   for example actuated,external (default quality medium)
 
             External traffic light controller
               --host <name>        controller host (default localhost)
@@ -115,11 +121,60 @@ public record SimulatorConfig(
         if (csv != null && !headless) {
             throw new IllegalArgumentException("--csv can only be used with --headless");
         }
+        duel = List.copyOf(Objects.requireNonNull(duel, "duel"));
+        validateDuel(duel, headless, port);
+    }
+
+    private static void validateDuel(List<String> duel, boolean headless, int port) {
+        if (duel.isEmpty()) {
+            return;
+        }
+        if (duel.size() != 2) {
+            throw new IllegalArgumentException("--duel needs exactly two controllers, for example actuated,fixed");
+        }
+        for (String name : duel) {
+            if (!SignalControllers.NAMES.contains(name)) {
+                throw new IllegalArgumentException("Unknown controller '" + name + "' in --duel, expected one of "
+                        + String.join(", ", SignalControllers.NAMES));
+            }
+        }
+        if (headless) {
+            throw new IllegalArgumentException("--duel needs a window and cannot be used with --headless");
+        }
+        if (bothExternal(duel) && port == 65535) {
+            throw new IllegalArgumentException("Two external controllers use --port and --port + 1, so --port must be below 65535");
+        }
+    }
+
+    private static boolean bothExternal(List<String> duel) {
+        return duel.size() == 2 && duel.stream().allMatch("external"::equals);
+    }
+
+    public boolean isDuel() {
+        return !duel.isEmpty();
+    }
+
+    /** The controller of side 0 (left) or 1 (right) of a duel. */
+    public String controllerFor(int side) {
+        checkSide(side);
+        return duel.get(side);
+    }
+
+    /** The external controller port of a duel side: two external controllers get neighbouring ports. */
+    public int portFor(int side) {
+        checkSide(side);
+        return side == 1 && bothExternal(duel) ? port + 1 : port;
+    }
+
+    private void checkSide(int side) {
+        if (!isDuel() || side < 0 || side > 1) {
+            throw new IllegalArgumentException("No duel side " + side);
+        }
     }
 
     public static SimulatorConfig defaults() {
         return new SimulatorConfig("actuated", DEFAULT_HOST, DEFAULT_PORT, 7.5 * 3600, LocalDate.now(), 1, 1, null, 1,
-                RenderQuality.HIGH, false, 0, null, CameraRig.Preset.OVERVIEW, null);
+                RenderQuality.HIGH, false, 0, null, CameraRig.Preset.OVERVIEW, null, List.of());
     }
 
     /**
@@ -145,11 +200,18 @@ public record SimulatorConfig(
         Path csv = null;
         CameraRig.Preset camera = d.camera;
         Path screenshot = null;
+        List<String> duel = List.of();
+        boolean qualityGiven = false;
+        boolean controllerGiven = false;
 
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
             switch (arg) {
-                case "--controller" -> controller = value(args, ++i, arg).toLowerCase(Locale.ROOT);
+                case "--controller" -> {
+                    controller = value(args, ++i, arg).toLowerCase(Locale.ROOT);
+                    controllerGiven = true;
+                }
+                case "--duel" -> duel = parseDuel(value(args, ++i, arg));
                 case "--host" -> host = value(args, ++i, arg);
                 case "--port" -> port = (int) number(args, ++i, arg);
                 case "--start" -> start = parseTime(value(args, ++i, arg));
@@ -158,7 +220,10 @@ public record SimulatorConfig(
                 case "--scale" -> scale = number(args, ++i, arg);
                 case "--demand" -> demand = Path.of(value(args, ++i, arg));
                 case "--seed" -> seed = (long) number(args, ++i, arg);
-                case "--quality" -> quality = parseEnum(RenderQuality.class, value(args, ++i, arg), arg);
+                case "--quality" -> {
+                    quality = parseEnum(RenderQuality.class, value(args, ++i, arg), arg);
+                    qualityGiven = true;
+                }
                 case "--headless" -> headless = true;
                 case "--duration" -> duration = number(args, ++i, arg);
                 case "--csv" -> csv = Path.of(value(args, ++i, arg));
@@ -168,8 +233,19 @@ public record SimulatorConfig(
                 default -> throw new IllegalArgumentException("Unknown option: " + arg);
             }
         }
+        if (!duel.isEmpty() && controllerGiven) {
+            throw new IllegalArgumentException("--duel picks both controllers and cannot be used with --controller");
+        }
+        if (!duel.isEmpty() && !qualityGiven) {
+            // two scenes on one graphics card
+            quality = RenderQuality.MEDIUM;
+        }
         return new SimulatorConfig(controller, host, port, start, date, speed, scale, demand, seed, quality, headless,
-                duration, csv, camera, screenshot);
+                duration, csv, camera, screenshot, duel);
+    }
+
+    private static List<String> parseDuel(String text) {
+        return Arrays.stream(text.split(",", -1)).map(n -> n.trim().toLowerCase(Locale.ROOT)).toList();
     }
 
     /** Parses {@code HH:MM} or {@code HH:MM:SS} into seconds after midnight. */

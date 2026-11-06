@@ -1,10 +1,12 @@
 package simplifiedsimulator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import simplifiedsimulator.render.CameraRig;
 import simplifiedsimulator.render.RenderQuality;
@@ -56,6 +58,58 @@ class SimulatorConfigTest {
         assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--speed"));
         assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--bogus"));
         assertThrows(SimulatorConfig.HelpRequested.class, () -> SimulatorConfig.parse("--help"));
+    }
+
+    @Test
+    void noDuelByDefault() {
+        assertFalse(SimulatorConfig.parse().isDuel());
+        assertEquals(List.of(), SimulatorConfig.parse().duel());
+    }
+
+    @Test
+    void parsesADuelAndDefaultsToMediumQuality() {
+        SimulatorConfig c = SimulatorConfig.parse("--duel", "Actuated, FIXED");
+        assertEquals(List.of("actuated", "fixed"), c.duel());
+        assertTrue(c.isDuel());
+        assertEquals("actuated", c.controllerFor(0));
+        assertEquals("fixed", c.controllerFor(1));
+        assertEquals(RenderQuality.MEDIUM, c.quality());
+    }
+
+    @Test
+    void explicitQualityWinsInADuelWhateverTheOrder() {
+        assertEquals(RenderQuality.HIGH, SimulatorConfig.parse("--duel", "actuated,fixed", "--quality", "high").quality());
+        assertEquals(RenderQuality.HIGH, SimulatorConfig.parse("--quality", "high", "--duel", "actuated,fixed").quality());
+    }
+
+    @Test
+    void twoExternalControllersGetNeighbouringPorts() {
+        SimulatorConfig both = SimulatorConfig.parse("--duel", "external,external", "--port", "4000");
+        assertEquals(4000, both.portFor(0));
+        assertEquals(4001, both.portFor(1));
+        SimulatorConfig one = SimulatorConfig.parse("--duel", "actuated,external", "--port", "4000");
+        assertEquals(4000, one.portFor(1));
+    }
+
+    @Test
+    void rejectsInvalidDuels() {
+        for (String[] args : List.of(
+                new String[] {"--duel", "actuated"},
+                new String[] {"--duel", "actuated,fixed,external"},
+                new String[] {"--duel", "actuated,smart"},
+                new String[] {"--duel", "actuated,fixed", "--headless", "--duration", "60"},
+                new String[] {"--duel", "actuated,fixed", "--controller", "fixed"},
+                new String[] {"--controller", "fixed", "--duel", "actuated,fixed"},
+                new String[] {"--duel", "external,external", "--port", "65535"})) {
+            assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse(args), String.join(" ", args));
+        }
+    }
+
+    @Test
+    void sideOutsideTheDuelIsRejected() {
+        SimulatorConfig c = SimulatorConfig.parse("--duel", "actuated,fixed");
+        assertThrows(IllegalArgumentException.class, () -> c.portFor(2));
+        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse().controllerFor(0));
     }
 
     @Test
