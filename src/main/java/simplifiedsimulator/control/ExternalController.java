@@ -44,6 +44,8 @@ public final class ExternalController implements SignalController {
     private volatile String announcedName;
     /** In lockstep every step waits for the controller's reply to the clock (for testing controllers). */
     private volatile boolean lockstep;
+    /** Whether the controller asked to hear when loops become free. */
+    private volatile boolean reportFreed;
     private boolean lockstepStarted;
     private long lockstepTimeoutMs = 5000;
     private final BlockingQueue<Double> clockReplies = new LinkedBlockingQueue<>();
@@ -65,7 +67,8 @@ public final class ExternalController implements SignalController {
         for (SignalGroup g : context.network().signalGroups()) {
             byNumber.put(g.number(), g);
         }
-        client = new ControllerClient(host, port, incoming::add, name -> announcedName = name, clockReplies::add);
+        client = new ControllerClient(host, port, incoming::add, name -> announcedName = name, clockReplies::add,
+                features -> reportFreed = features.contains("sensorfree"));
         connect();
     }
 
@@ -165,6 +168,9 @@ public final class ExternalController implements SignalController {
         for (Detector d : ctx.detectors().all()) {
             if (ctx.detectors().justOccupied(d)) {
                 client.send(ProtocolCodec.encodeSensor(d.group().number()));
+            }
+            if (reportFreed && ctx.detectors().justFreed(d)) {
+                client.send(ProtocolCodec.encodeSensorFree(d.group().number()));
             }
         }
     }

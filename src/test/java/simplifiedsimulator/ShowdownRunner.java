@@ -71,6 +71,27 @@ public final class ShowdownRunner {
         System.out.printf(Locale.ROOT, "RESULT,%s,%d,%.1f,%.2f,%.1f,%.1f,%.1f,%d,%d,%d,%d,%d%n", config.controller(),
                 s.motorCompleted(), s.motorDelay(), s.motorStops(), s.busDelay(), s.bikeDelay(), s.footDelay(),
                 s.maxQueue(), s.entryQueue(), s.redLightRuns(), s.signalConflicts(), s.conflictViolations());
+        // why road users stand still at the end: route, reason, and who they wait for
+        java.util.Map<String, Integer> stuck = new java.util.TreeMap<>();
+        for (simplifiedsimulator.sim.Agent a : sim.agents()) {
+            if (a.speed() < 0.5 && a.waitingTime() > 30) {
+                simplifiedsimulator.sim.Agent other = a.yieldingTo() != null ? a.yieldingTo() : null;
+                String key = a.routeId() + " " + a.reason()
+                        + (other != null ? " for " + other.routeId() : "")
+                        + (a.reason() == simplifiedsimulator.sim.Agent.Reason.SIGNAL ? " at " + a.geometry().route().group().id()
+                        + " " + sim.signalState(a.geometry().route().group()) : "");
+                stuck.merge(key, 1, Integer::sum);
+            }
+        }
+        stuck.forEach((k, n) -> System.out.printf(Locale.ROOT, "STUCK,%d,%s%n", n, k));
+        for (simplifiedsimulator.sim.Agent a : sim.agents()) {
+            if (a.leader() == null && a.waitingTime() > 30) {
+                System.out.printf(Locale.ROOT, "HEAD,%s,%s,speed %.2f,waited %.0f,at %.1f of stop line %.1f,group %s %s,yield %s%n",
+                        a.routeId(), a.reason(), a.speed(), a.waitingTime(), a.position(), a.geometry().stopLine(),
+                        a.geometry().route().group().id(), sim.signalState(a.geometry().route().group()),
+                        a.yieldingTo() == null ? "-" : a.yieldingTo().routeId());
+            }
+        }
         for (MovementStats m : sim.statistics().movements(sim.time())) {
             System.out.printf(Locale.ROOT, "MOVEMENT,%s,%d,%.1f,%.2f,%d%n", m.key(), m.completed(), m.meanDelay(),
                     m.meanStops(), m.queue());

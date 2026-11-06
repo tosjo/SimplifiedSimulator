@@ -21,6 +21,7 @@ public final class DetectorStates {
     private static final class State {
         boolean occupied;
         boolean risingEdge;
+        boolean fallingEdge;
         double lastOccupied = Double.NEGATIVE_INFINITY;
     }
 
@@ -39,6 +40,7 @@ public final class DetectorStates {
             State s = states.get(d);
             boolean occ = occupied.contains(d);
             s.risingEdge = occ && !s.occupied;
+            s.fallingEdge = !occ && s.occupied;
             s.occupied = occ;
             if (occ) {
                 s.lastOccupied = time;
@@ -62,6 +64,11 @@ public final class DetectorStates {
     /** True in the step in which a road user arrived on the detector. */
     public boolean justOccupied(Detector d) {
         return states.get(d).risingEdge;
+    }
+
+    /** True in the step in which the last road user left the detector. */
+    public boolean justFreed(Detector d) {
+        return states.get(d).fallingEdge;
     }
 
     /** Seconds since the detector was last occupied; 0 while it is occupied. */

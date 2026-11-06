@@ -80,4 +80,20 @@ class ProtocolCodecTest {
             assertTrue(ProtocolCodec.decodeClockDone(bad).isEmpty(), bad);
         }
     }
+
+    @Test
+    void encodesALoopBecomingFree() {
+        assertEquals("{\"sensorfree\":{\"id\":3}}", ProtocolCodec.encodeSensorFree(3));
+    }
+
+    @Test
+    void decodesTheFeaturesAControllerAsksFor() {
+        assertEquals(java.util.Optional.of(java.util.Set.of("sensorfree")),
+                ProtocolCodec.decodeFeatures("{\"Features\":[\"SensorFree\"]}"));
+        assertEquals(java.util.Optional.of(java.util.Set.of()), ProtocolCodec.decodeFeatures("{\"features\":[]}"));
+        for (String bad : new String[] {"{\"features\":\"sensorfree\"}", "{\"features\":[3]}", "nope",
+                "{\"sensorstate\":{\"id\":2}}"}) {
+            assertTrue(ProtocolCodec.decodeFeatures(bad).isEmpty(), bad);
+        }
+    }
 }

@@ -3,6 +3,32 @@
 All notable changes to this project are documented here. The project follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-11-06
+
+### Added
+- `tools/controller/original2014.py`: our original 2014 C# controller, ported faithfully to
+  Python with today's group numbers and conflicts.
+- `tools/controller/smart.py`: the fastest controller we could make. It builds on the
+  built-in vehicle-actuated logic and adds a variable minimum green, rest in green, the
+  longest-waiting module going next, higher maximum greens and a sharper bus priority. Over
+  three seeds of morning and evening rush it has about 25-30% less vehicle delay than the
+  built-in controller; at 200% traffic it moves 20% more vehicles.
+- Protocol, all optional and backwards compatible: controllers can announce their name
+  (shown above the duel scoreboard columns) and ask for `sensorfree` messages when a loop
+  becomes free.
+- Lockstep test mode and `./gradlew showdown` to measure a controller deterministically,
+  in about half a minute per simulated hour, including per-movement results.
+- `tools/controller/shared.py` holds the conflict table, protocol and server for all Python
+  controllers.
+
+### Changed
+- Simulator and Python controllers send their messages without TCP batching, so light changes
+  take effect sooner.
+
+### Fixed
+- Buses no longer starve other directions in the smart controller when they come often (the
+  built-in controller still has this weakness, which only shows with frequent buses).
+
 ## [1.3.0] - 2026-11-06
 
 ### Added

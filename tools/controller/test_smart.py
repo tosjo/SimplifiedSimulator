@@ -80,6 +80,68 @@ class SmartControllerTest(unittest.TestCase):
         expected = s.STARTUP + s.HEADWAY * 20 / s.LANES.get(2, 1)
         self.assertGreaterEqual(ended - green, min(expected, s.MAX_GREEN[2]) - 2 * DT)
 
+    def test_asks_the_simulator_for_free_reports(self):
+        self.assertIn("sensorfree", s.SmartController.FEATURES)
+
+    def test_an_occupied_loop_holds_the_green_without_new_reports(self):
+        # a queue stands still over 02's loop: one report, no free report, someone conflicting waits
+        ctrl = s.SmartController(0.0)
+        ctrl.detector_free(2, -1.0)  # the simulator reports free loops
+        changes = run(ctrl, 0.0, 120.0, [(0.0, 2), (12.0, 5)])
+        green, ended = first(changes, 2, GREEN), first(changes, 2, AMBER_STATE)
+        self.assertAlmostEqual(s.MAX_GREEN[2], ended - green, delta=2 * DT)
+
+    def test_a_loop_freed_ends_the_green_one_gap_later(self):
+        ctrl = s.SmartController(0.0)
+        ctrl.detector_free(2, -1.0)
+        changes = []
+        now = 0.0
+        while now <= 80:
+            if abs(now - 0.0) < 1e-9:
+                ctrl.detector(2, now)
+            if abs(now - 12.0) < 1e-9:
+                ctrl.detector(5, now)
+            if abs(now - 20.0) < 1e-9:
+                ctrl.detector_free(2, now)
+            changes.extend((now, g, st) for g, st in ctrl.tick(now))
+            now = round(now + DT, 6)
+        self.assertAlmostEqual(20.0 + s.GAP[2], first(changes, 2, AMBER_STATE), delta=2 * DT)
+
+    def test_someone_left_on_an_occupied_loop_at_red_is_requested(self):
+        ctrl = s.SmartController(0.0)
+        ctrl.detector_free(24, -1.0)
+        # a cyclist reaches the loop during 24's green and is still on it when the green ends
+        green = max(INTERGREEN[o][24] for o in INTERGREEN[24])
+        arrivals = [(0.0, 24), (green + 1.0, 7)]
+        changes = []
+        pending = sorted(arrivals)
+        now = 0.0
+        while now <= 200:
+            while pending and pending[0][0] <= now:
+                ctrl.detector(pending.pop(0)[1], now)
+            if abs(now - (green + 0.5)) < 1e-9:
+                ctrl.detector_free(24, now)  # the first cyclist leaves
+                ctrl.detector(24, now)  # the next one arrives and stays
+            changes.extend((now, g, st) for g, st in ctrl.tick(now))
+            now = round(now + DT, 6)
+        self.assertGreaterEqual(len([t for t, g, st in changes if g == 24 and st == GREEN]), 2)
+
+    def test_a_cyclist_left_on_the_loop_when_green_ends_still_gets_a_turn(self):
+        # cyclists keep reporting during 24's green, so it runs to its maximum; the last one is
+        # still on the loop when it ends and reports nothing more. 07 conflicts with 24.
+        # 24 turns green after the longest clearance into it and ends at its maximum, 0.2 s
+        # after the last report
+        green = max(INTERGREEN[o][24] for o in INTERGREEN[24])
+        arrivals = [(0.0, 24)] + steady(24, green + 0.8, green + s.MAX_GREEN[24] - 0.1, 1.0) + [(15.0, 7)]
+        changes = run(s.SmartController(0.0), 0.0, 200.0, arrivals)
+        greens_24 = [t for t, g, st in changes if g == 24 and st == GREEN]
+        self.assertGreaterEqual(len(greens_24), 2, "24 got green again for the cyclist left waiting")
+
+    def test_no_new_request_when_nobody_reported_near_the_end(self):
+        arrivals = [(0.0, 24), (2.0, 24), (5.0, 7)]
+        changes = run(s.SmartController(0.0), 0.0, 200.0, arrivals)
+        self.assertEqual(1, len([t for t, g, st in changes if g == 24 and st == GREEN]))
+
     def test_variable_minimum_never_exceeds_the_maximum(self):
         arrivals = [(0.01 * i, 3) for i in range(200)] + [(5.0, 5)]
         changes = run(s.SmartController(0.0), 0.0, 120.0, arrivals)
@@ -110,6 +172,17 @@ class SmartControllerTest(unittest.TestCase):
         self.assertIsNotNone(ended_09)
         self.assertLessEqual(ended_09 - max(green_09, 30.0), s.MIN_GREEN[9] + s.BUS_CUT + 2 * DT)
         self.assertIsNotNone(first(changes, 41, GREEN))
+
+    def test_pressure_order_serves_the_longest_waiting_module_first(self):
+        before, s.ORDER = s.ORDER, "pressure"
+        try:
+            # a busy 02 (module 1) holds up 11 (module 4, waiting since 12 s) and 6 (module 2, since
+            # 30 s); after module 1 the cycle would serve module 2 first, the pressure module 4
+            arrivals = steady(2, 0.0, 60.0, 0.5) + [(12.0, 11), (30.0, 6)]
+            changes = run(s.SmartController(0.0), 0.0, 120.0, arrivals)
+            self.assertLess(first(changes, 11, GREEN), first(changes, 6, GREEN))
+        finally:
+            s.ORDER = before
 
     def test_frequent_buses_cannot_starve_the_other_directions(self):
         # buses on 41 and 42 keep asking; 05 (module 2, no bus) must still get its turn

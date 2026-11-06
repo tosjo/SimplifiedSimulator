@@ -20,7 +20,20 @@ rewritten for what the protocol offers: a report whenever a road user reaches a 
   has waited longer than FAIR_WAIT s, so frequent buses cannot starve the other directions.
 
 On top of that come the improvements that made it faster in the measurements
-(./gradlew showdown, morning rush). Each one can be switched off below.
+(./gradlew showdown in lockstep). Each one can be switched off below:
+
+- It asks the simulator for "sensorfree" reports, so it knows who is standing on a loop,
+  exactly what the built-in controller knows. Without them it falls back to lingering
+  requests.
+- A variable minimum green clears the queue counted at red.
+- Rest in green: a green nobody conflicting needs is not ended.
+- The next module is the one that has waited longest in total, not the next in the cycle.
+- Higher maximum greens and a sharper bus priority.
+
+Morning and evening rush, 3 seeds each, against the built-in vehicle-actuated controller:
+57.9 s instead of 80.5 s average vehicle delay, 0.92 instead of 1.23 stops, more vehicles
+through; at 200% traffic 20% more vehicles through. Cyclists, pedestrians and buses wait
+a few seconds longer than with the built-in controller.
 """
 
 import sys
@@ -50,15 +63,23 @@ KIND = {2: "main", 8: "main", 5: "side", 11: "side",
 # --------------------------------------------------------------------------------------
 
 MIN_BY_KIND = {"main": 6.0, "side": 6.0, "turn": 5.0, "bus": 4.0, "bike": 6.0, "foot": 7.0}
-MAX_BY_KIND = {"main": 30.0, "side": 20.0, "turn": 15.0, "bus": 12.0, "bike": 10.0, "foot": 7.0}
+# Longer than the built-in 30/20/15 s: with the variable minimum and occupancy the greens
+# end when the queue is gone, so a higher ceiling only helps at rush hour (tuned with lockstep
+# runs over 3 seeds, morning and evening rush, and checked on 3 other seeds)
+MAX_BY_KIND = {"main": 50.0, "side": 30.0, "turn": 25.0, "bus": 12.0, "bike": 10.0, "foot": 7.0}
 GAP_BY_KIND = {"main": 2.5, "side": 2.5, "turn": 2.5, "bus": 3.0, "bike": 2.0, "foot": 0.0}
 
 ALT_MAX = 12.0        # longest alternative green
 BUS_EXTENSION = 10.0  # extra green for an approaching bus
 BUS_APPROACH = 8.0    # a bus reported this recently is approaching
-BUS_CUT = 4.0         # a waiting bus shortens conflicting greens to minimum + this
+BUS_CUT = 2.0         # a waiting bus shortens conflicting greens to minimum + this
 AMBER = 3.0           # amber for vehicles; pedestrians go straight from green to red
-FAIR_WAIT = 90.0      # buses stop jumping the queue once anyone has waited this long
+FAIR_WAIT = 60.0      # buses and pressure stop jumping the queue once anyone has waited this long
+
+# Which module goes next: "cyclic" takes the modules in turn (like the built-in controller),
+# "pressure" takes the one whose waiting primary groups have waited longest in total. Once
+# anyone has waited FAIR_WAIT s the cycle applies again, so nobody is starved.
+ORDER = "pressure"
 
 REST_IN_GREEN = True  # a green is not ended while nobody conflicting is waiting
 
@@ -72,7 +93,14 @@ HEADWAY = 2.0
 LANES = {2: 2, 8: 2}
 QUEUING = {"main", "side", "turn", "bus"}
 
+# Lingering requests: someone who reached the loop just before the green ended may still be
+# standing on it, and reports nothing more (the built-in controller sees the loop occupied).
+# A green that ends within LINGER s of a report therefore leaves a request behind. Cyclists
+# and pedestrians have no upstream loop to report the people behind them, so they need it most.
+LINGER_BY_KIND = {"main": 1.0, "side": 1.0, "turn": 1.0, "bus": 1.0, "bike": 3.0, "foot": 3.0}
+
 MIN_GREEN = {g: MIN_BY_KIND[k] for g, k in KIND.items()}
+LINGER = {g: LINGER_BY_KIND[k] for g, k in KIND.items()}
 MAX_GREEN = {g: MAX_BY_KIND[k] for g, k in KIND.items()}
 GAP = {g: GAP_BY_KIND[k] for g, k in KIND.items()}
 
@@ -81,6 +109,8 @@ class SmartController:
     """Same interface as the other controllers (see shared.py)."""
 
     NAME = "Smart"
+    # ask the simulator to report loops becoming free, so we know who stands on a loop
+    FEATURES = ["sensorfree"]
 
     def __init__(self, now, intergreen=INTERGREEN, modules=MODULES):
         self.intergreen = intergreen
@@ -90,6 +120,9 @@ class SmartController:
         self.green_ended = {g: now for g in intergreen}  # start as if everything just turned red
         self.amber_until = {}
         self.last_report = {g: float("-inf") for g in intergreen}
+        self.last_free = {g: float("-inf") for g in intergreen}
+        self.occupied = {g: 0 for g in intergreen}  # loops of the group with someone on them
+        self.knows_occupancy = False  # becomes true with the first free report
         self.requests = set()
         self.requested_at = {}
         self.waiting_reports = {}
@@ -106,10 +139,19 @@ class SmartController:
         if group not in self.state:
             return
         self.last_report[group] = now
+        self.occupied[group] += 1
         if self.state[group] != GREEN:
             self.requests.add(group)
             self.requested_at.setdefault(group, now)
             self.waiting_reports[group] = self.waiting_reports.get(group, 0) + 1
+
+    def detector_free(self, group, now):
+        """The last road user left one of the group's loops."""
+        if group not in self.state:
+            return
+        self.knows_occupancy = True
+        self.occupied[group] = max(0, self.occupied[group] - 1)
+        self.last_free[group] = now
 
     def tick(self, now):
         changes = []
@@ -125,6 +167,12 @@ class SmartController:
             self.current = self._next_module(now)
             self.served.clear()
 
+        if self.knows_occupancy:
+            # like the built-in controller: someone standing on a loop at red is waiting
+            for g, count in self.occupied.items():
+                if count > 0 and self.state[g] != GREEN:
+                    self.requests.add(g)
+                    self.requested_at.setdefault(g, now)
         bus_waiting = self._waiting_bus()
         if self.current >= 0:
             for g in self.modules[self.current][1]:
@@ -162,6 +210,12 @@ class SmartController:
         for i in order if not someone_overdue else []:
             if any(g in BUSES and g in self.requests for g in self.modules[i][0]):
                 return i
+        if ORDER == "pressure" and not someone_overdue:
+            pressure = {i: sum(now - self.requested_at.get(g, now) for g in self.modules[i][0] if g in self.requests)
+                        for i in order}
+            best = max(order, key=lambda i: pressure[i])  # ties: the first in the cycle
+            if pressure[best] > 0:
+                return best
         for i in order:
             if any(g in self.requests for g in self.modules[i][0]):
                 return i
@@ -179,7 +233,10 @@ class SmartController:
 
     def _keep_green(self, g, bus_waiting, now):
         on = now - self.green_started[g]
-        if on < self.min_this_green.get(g, MIN_GREEN[g]) - 1e-9:
+        bus_blocked = bus_waiting is not None and self._conflicts(g, bus_waiting)
+        # a waiting bus only has to wait for the real minimum, not for the queue to clear
+        shortest = MIN_GREEN[g] if bus_blocked else self.min_this_green.get(g, MIN_GREEN[g])
+        if on < shortest - 1e-9:
             return True
         longest = min(MAX_GREEN[g], ALT_MAX) if g in self.alternative else MAX_GREEN[g]
         if g in BUSES and now - self.last_report[g] < BUS_APPROACH:
@@ -192,7 +249,13 @@ class SmartController:
             return False
         if g in self.alternative and self._conflicts_with_waiting_member(g):
             return False
-        return GAP[g] > 0 and now - self.last_report[g] < GAP[g]
+        return GAP[g] > 0 and self._detected_within(g, GAP[g], now)
+
+    def _detected_within(self, g, gap, now):
+        if self.knows_occupancy:
+            # an occupied loop counts as traffic, like a queue standing over the upstream loop
+            return self.occupied[g] > 0 or now - max(self.last_free[g], self.last_report[g]) <= gap
+        return now - self.last_report[g] < gap
 
     def _conflicting_request(self, g):
         return any(r in self.intergreen[g] for r in self.requests)
@@ -252,6 +315,10 @@ class SmartController:
 
     def _end_green(self, group, now, changes):
         self.green_ended[group] = now
+        if not self.knows_occupancy and now - self.last_report[group] < LINGER[group]:
+            self.requests.add(group)
+            self.requested_at.setdefault(group, now)
+            self.waiting_reports[group] = self.waiting_reports.get(group, 0) + 1
         if group in PEDESTRIANS:
             self._set(group, RED, changes)
         else:

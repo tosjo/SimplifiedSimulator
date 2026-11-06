@@ -24,9 +24,9 @@ Only the Python standard library is used (Python 3.8 or newer).
 import sys
 
 from shared import (AMBER_STATE, GREEN, INTERGREEN, PEDESTRIANS, RED, STATE_NAMES,  # noqa: F401 - re-exported
-                    Framer, argument_parser, check_plan, encode_clockdone, encode_light, encode_name,
-                    format_groups, log, open_server, parse_clock, parse_sensor, run_server, serve_session,
-                    validate)
+                    Framer, argument_parser, check_plan, encode_clockdone, encode_features, encode_light,
+                    encode_name, format_groups, log, open_server, parse_clock, parse_sensor, parse_sensor_free,
+                    run_server, serve_session, validate)
 
 # --------------------------------------------------------------------------------------
 # Settings

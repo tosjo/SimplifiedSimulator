@@ -126,6 +126,20 @@ def parse_clock(message):
     return float(value)
 
 
+def parse_sensor_free(message):
+    """Returns the group number of a {"sensorfree":{"id":N}} message (a loop became free), or None."""
+    try:
+        group = json.loads(message)["sensorfree"]["id"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    return group if isinstance(group, int) and not isinstance(group, bool) else None
+
+
+def encode_features(features):
+    """Asks the simulator for optional messages, for example ["sensorfree"]."""
+    return json.dumps({"features": list(features)}).encode("utf-8") + b"\0"
+
+
 def encode_clockdone(time_):
     """Tells the simulator in lockstep that every light change for time_ has been sent."""
     return json.dumps({"clockdone": {"time": time_}}).encode("utf-8") + b"\0"
@@ -165,7 +179,9 @@ def serve_session(conn, clock, make_controller, verbose, tick=0.05):
     conn.settimeout(tick)
     framer = Framer()
     controller = make_controller(clock())
+    features = getattr(controller, "FEATURES", [])
     conn.sendall(encode_name(controller.NAME)
+                 + (encode_features(features) if features else b"")
                  + b"".join(encode_light(g, s) for g, s in controller.startup_messages()))
     lockstep = False
     sim_time = 0.0
@@ -193,10 +209,14 @@ def serve_session(conn, clock, make_controller, verbose, tick=0.05):
                 out.append(encode_clockdone(moment))
                 continue
             group = parse_sensor(message)
-            if group is None:
-                log("ignoring unexpected message: %.80s" % message)
+            if group is not None:
+                controller.detector(group, now())
                 continue
-            controller.detector(group, now())
+            freed = parse_sensor_free(message)
+            if freed is not None and hasattr(controller, "detector_free"):
+                controller.detector_free(freed, now())
+                continue
+            log("ignoring unexpected message: %.80s" % message)
         if not lockstep:
             out.append(_encode_changes(controller, controller.tick(now()), verbose))
         if any(out):

@@ -103,3 +103,18 @@ from the existing batch runner.
 - **Beating actuated is not guaranteed:** actuated sees the same detectors, but it runs
   inside the simulator with no network delay. If the smart controller does not win, I will
   say so with the numbers.
+
+## Outcome
+
+- **The first "smart" design did not work.** It had no cycle and served groups purely by urgency, and at rush hour it thrashed (185-262 s vehicle delay). It was rebuilt on the built-in ActuatedController's module logic.
+- **Measuring at 16× was misleading.** TCP batching and wall-clock pacing distorted the timings. A lockstep test mode replaced the pacing; it is deterministic and runs an hour in about half a minute.
+- **The protocol hid who stands on a loop.** Arrival reports alone cannot tell that someone is still waiting there, so cyclists and pedestrians could starve. An optional `sensorfree` message fixes this. With it, the plain port matches the built-in controller (88.3 s against 88.7 s).
+- **Tuning over 3 seeds × 2 rush hours, checked on 3 other seeds:**
+  - **What helped:**
+    - variable minimum green
+    - rest in green
+    - pressure order with a 60 s fairness limit
+    - maximum greens of 50/30/25 s (main/side/turn)
+    - bus cut 2 s
+    - bus priority ignoring the variable minimum
+  - **Result:** 61-63 s against 81-89 s for the built-in controller, and +20% vehicles at 200% traffic.

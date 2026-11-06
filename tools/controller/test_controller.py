@@ -190,6 +190,15 @@ class ProtocolTest(unittest.TestCase):
             with self.subTest(bad=bad):
                 self.assertIsNone(c.parse_clock(bad))
 
+    def test_parses_a_free_loop(self):
+        self.assertEqual(24, c.parse_sensor_free('{"sensorfree":{"id":24}}'))
+        for bad in ['{"sensorfree":{}}', '{"sensorstate":{"id":2}}', '{"sensorfree":{"id":true}}', "nope"]:
+            with self.subTest(bad=bad):
+                self.assertIsNone(c.parse_sensor_free(bad))
+
+    def test_encodes_the_features_message(self):
+        self.assertEqual({"features": ["sensorfree"]}, json.loads(c.encode_features(["sensorfree"])[:-1]))
+
     def test_encodes_the_clock_reply(self):
         self.assertEqual({"clockdone": {"time": 12.3}}, json.loads(c.encode_clockdone(12.3)[:-1]))
 

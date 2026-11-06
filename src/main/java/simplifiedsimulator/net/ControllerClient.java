@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 import java.util.logging.Level;
@@ -35,6 +36,7 @@ public final class ControllerClient implements AutoCloseable {
     private final Consumer<LightUpdate> listener;
     private final Consumer<String> nameListener;
     private final DoubleConsumer clockListener;
+    private final Consumer<Set<String>> featureListener;
 
     private Socket socket;
     private Writer out;
@@ -56,6 +58,15 @@ public final class ControllerClient implements AutoCloseable {
      */
     public ControllerClient(String host, int port, Consumer<LightUpdate> listener, Consumer<String> nameListener,
                             DoubleConsumer clockListener) {
+        this(host, port, listener, nameListener, clockListener, features -> { });
+    }
+
+    /**
+     * @param featureListener gets the optional features the controller asks for
+     */
+    public ControllerClient(String host, int port, Consumer<LightUpdate> listener, Consumer<String> nameListener,
+                            DoubleConsumer clockListener, Consumer<Set<String>> featureListener) {
+        this.featureListener = Objects.requireNonNull(featureListener, "featureListener");
         this.host = Objects.requireNonNull(host, "host");
         this.port = port;
         this.listener = Objects.requireNonNull(listener, "listener");
@@ -162,6 +173,11 @@ public final class ControllerClient implements AutoCloseable {
             Optional<String> name = ProtocolCodec.decodeName(message);
             if (name.isPresent()) {
                 nameListener.accept(name.get());
+                return;
+            }
+            Optional<Set<String>> features = ProtocolCodec.decodeFeatures(message);
+            if (features.isPresent()) {
+                featureListener.accept(features.get());
                 return;
             }
             LOG.warning(() -> "Ignoring unrecognised message: " + message);

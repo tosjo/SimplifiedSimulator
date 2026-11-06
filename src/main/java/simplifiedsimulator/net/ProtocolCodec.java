@@ -5,9 +5,11 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import java.util.Locale;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.Set;
 
 /**
  * Encodes and decodes the JSON messages exchanged with the traffic light controller.
@@ -19,6 +21,9 @@ import java.util.OptionalDouble;
  *       {@code {"lightstate":{"id":5,"state":2}}} (0 = red, 1 = orange, 2 = green)</li>
  *   <li>Controller to simulator, optional, to say who it is:
  *       {@code {"controllername":{"name":"Smart"}}} (shown on screen)</li>
+ *   <li>Optional, only for controllers that ask for it with {@code {"features":["sensorfree"]}}:
+ *       when the last road user leaves a detector, {@code {"sensorfree":{"id":5}}}. Together
+ *       with the sensor messages this tells the controller who is still standing on a loop.</li>
  *   <li>Lockstep, only when switched on (for testing controllers): after the sensor messages
  *       of a step the simulator sends {@code {"clock":{"time":12.3}}} and waits until the
  *       controller has sent its light states followed by {@code {"clockdone":{"time":12.3}}}.
@@ -57,6 +62,35 @@ public final class ProtocolCodec {
             }
             return Optional.of(new LightUpdate(parsed.lightstate.id, LightState.fromCode(parsed.lightstate.state)));
         } catch (JsonParseException | IllegalArgumentException e) {
+            return Optional.empty();
+        }
+    }
+
+    /** Builds the message that the last road user left a detector of {@code lightId}. */
+    public static String encodeSensorFree(int lightId) {
+        return GSON.toJson(new SensorFreeMessage(new IdHolder(lightId)));
+    }
+
+    /**
+     * Decodes the features a controller asks for, lower case.
+     *
+     * @return the features, or empty if the message is not a features message
+     */
+    public static Optional<Set<String>> decodeFeatures(String message) {
+        try {
+            JsonElement list = member(JsonParser.parseString(message), "features");
+            if (list == null || !list.isJsonArray()) {
+                return Optional.empty();
+            }
+            Set<String> features = new HashSet<>();
+            for (JsonElement e : list.getAsJsonArray()) {
+                if (!e.isJsonPrimitive() || !e.getAsJsonPrimitive().isString()) {
+                    return Optional.empty();
+                }
+                features.add(e.getAsString().toLowerCase(Locale.ROOT));
+            }
+            return Optional.of(Set.copyOf(features));
+        } catch (JsonParseException e) {
             return Optional.empty();
         }
     }
@@ -125,6 +159,9 @@ public final class ProtocolCodec {
     }
 
     private record SensorMessage(IdHolder sensorstate) {
+    }
+
+    private record SensorFreeMessage(IdHolder sensorfree) {
     }
 
     private record TimeHolder(double time) {
