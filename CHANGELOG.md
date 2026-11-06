@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The project follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-11-07
+
+### Fixed
+- With `--once` a Python controller stopped when another program on the PC briefly knocked on
+  its port (Razer's app engine checks port 1337 about once a minute), so the duel's left side
+  was not connected. Connections that close within a second no longer count as the simulator.
+
 ## [1.4.1] - 2026-11-07
 
 ### Added
