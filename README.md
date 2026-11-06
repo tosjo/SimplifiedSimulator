@@ -141,6 +141,27 @@ arrive at random (Poisson) at those rates. There are no public counts for this c
 the volumes are estimates; if you have real counts, put them in a copy of the file and
 start with `--demand`.
 
+### Python controller, ready to run
+
+[`tools/controller/controller.py`](tools/controller/controller.py) is a complete external
+controller that needs nothing but Python 3.8 or newer. Start it, then the simulator:
+
+```sh
+python tools/controller/controller.py
+./gradlew run --args="--controller external"
+```
+
+If the simulator is already running, press `C` until it says "External controller" and then
+`R` to connect. The controller gives green only where someone is waiting, holds it while
+traffic keeps coming and skips directions nobody needs; `--fixed` runs a plain fixed cycle
+instead. It does not hear about the simulator's clock, so if you speed the simulation up,
+start the controller with the same `--speed` (and don't change the speed while they run).
+
+To make your own controller, edit the settings at the top of the file: the phases (which
+groups may be green together), the green times and the intergreen table. It refuses to start
+a plan that would give conflicting groups green together. Its tests run with
+`python -m unittest discover -s tools/controller`.
+
 ### External controller protocol
 
 The simulator is the TCP client. Messages are JSON objects, each followed by a NUL byte
@@ -178,6 +199,7 @@ src/main/java/simplifiedsimulator
 ├── ui/         statistics, signal timeline and help on screen
 └── net/        TCP connection to an external controller
 tools/crossing/   scripts that build the crossing data from the open sources
+tools/controller/ ready-to-run external controller in Python
 ```
 
 `./gradlew build` compiles and runs the tests, which include two hours of rush-hour traffic
