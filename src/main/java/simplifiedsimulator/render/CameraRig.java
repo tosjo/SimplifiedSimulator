@@ -101,6 +101,7 @@ public final class CameraRig extends BaseAppState implements ActionListener, Ana
     private boolean dragging;
     private boolean panning;
     private boolean dragMoved;
+    private boolean picking = true;
     private final boolean[] held = new boolean[KEYS.length];
 
     /**
@@ -118,7 +119,7 @@ public final class CameraRig extends BaseAppState implements ActionListener, Ana
     @Override
     protected void initialize(Application app) {
         cam = app.getCamera();
-        cam.setFrustumPerspective(50f, (float) cam.getWidth() / cam.getHeight(), 0.25f, 12000f);
+        cam.setFrustumPerspective(50f, aspect(cam), 0.25f, 12000f);
         FlyCamAppState fly = app.getStateManager().getState(FlyCamAppState.class);
         if (fly != null) {
             app.getStateManager().detach(fly);
@@ -396,7 +397,22 @@ public final class CameraRig extends BaseAppState implements ActionListener, Ana
         }
     }
 
+    /** Width over height of the part of the window the camera draws into. */
+    static float aspect(Camera cam) {
+        float w = cam.getWidth() * (cam.getViewPortRight() - cam.getViewPortLeft());
+        float h = cam.getHeight() * (cam.getViewPortTop() - cam.getViewPortBottom());
+        return w / h;
+    }
+
+    /** Whether clicking a road user starts following it. */
+    public void setPicking(boolean enabled) {
+        picking = enabled;
+    }
+
     private void click() {
+        if (!picking) {
+            return;
+        }
         Vector2f cursor = input.getCursorPosition();
         Vector3f near = cam.getWorldCoordinates(cursor, 0f);
         Vector3f far = cam.getWorldCoordinates(cursor, 1f);
