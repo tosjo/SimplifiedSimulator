@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The project follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-11-06
+
+### Added
+- Ready-to-run external traffic light controller in Python (`tools/controller/controller.py`,
+  standard library only): gives green on demand, extends it while traffic keeps coming,
+  skips empty phases and checks its plan against the conflict table before it starts.
+  `--fixed` runs a fixed cycle, `--speed` matches a sped-up simulation.
+
 ## [1.0.1] - 2026-11-06
 
 ### Fixed

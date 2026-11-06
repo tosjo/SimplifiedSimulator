@@ -3,6 +3,9 @@
 build/
 !gradle/wrapper/gradle-wrapper.jar
 
+# Python
+__pycache__/
+
 # IDEs
 .idea/
 *.iml
