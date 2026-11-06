@@ -9,6 +9,7 @@ import com.jme3.renderer.queue.RenderQueue;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.shape.Quad;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -30,6 +31,7 @@ public final class DuelHud extends BaseAppState {
     private final Simulation left;
     private final Simulation right;
     private final Supplier<AppStatus> status;
+    private final List<String> labels;
     private final Node root = new Node("Duel HUD");
     private Panel statusPanel;
     private Panel scorePanel;
@@ -43,10 +45,14 @@ public final class DuelHud extends BaseAppState {
     private float sinceRefresh = REFRESH;
     private float messageAge = MESSAGE_TIME;
 
-    public DuelHud(Simulation left, Simulation right, Supplier<AppStatus> status) {
+    /**
+     * @param labels names for the two sides from the command line, or an empty list
+     */
+    public DuelHud(Simulation left, Simulation right, Supplier<AppStatus> status, List<String> labels) {
         this.left = Objects.requireNonNull(left);
         this.right = Objects.requireNonNull(right);
         this.status = Objects.requireNonNull(status);
+        this.labels = List.copyOf(labels);
     }
 
     @Override
@@ -100,11 +106,10 @@ public final class DuelHud extends BaseAppState {
         sinceRefresh = REFRESH;
     }
 
-    /** Names for the two sides; identical controllers are told apart by their side. */
+    /** Names for the two sides, see {@link DuelScore#sideNames}. */
     public String[] sideNames() {
-        String a = left.controller().name();
-        String b = right.controller().name();
-        return a.equals(b) ? new String[] {a + " (left)", b + " (right)"} : new String[] {a, b};
+        return DuelScore.sideNames(left.controller().name(), right.controller().name(), labels)
+                .toArray(String[]::new);
     }
 
     @Override
@@ -118,10 +123,6 @@ public final class DuelHud extends BaseAppState {
         int w = getApplication().getCamera().getWidth();
         int h = getApplication().getCamera().getHeight();
 
-        dividerQuad.updateGeometry(DIVIDER_WIDTH, h);
-        divider.updateModelBound();
-        divider.setLocalTranslation(Math.round(w / 2f - DIVIDER_WIDTH / 2), 0, -1);
-
         statusPanel.setText(statusText(status.get()));
         statusPanel.layout(w, h);
 
@@ -131,7 +132,13 @@ public final class DuelHud extends BaseAppState {
         scorePanel.setText(HudText.duelTable(new DuelScore.Side(names[0], a, queueNow(left)),
                 new DuelScore.Side(names[1], b, queueNow(right))));
         scorePanel.layout(w, h);
-        scorePanel.setLocalTranslation(Math.round((w - scorePanel.width()) / 2), Math.round(h - 12 - scorePanel.height()), 0);
+        float scoreBottom = Math.round(h - 12 - scorePanel.height());
+        scorePanel.setLocalTranslation(Math.round((w - scorePanel.width()) / 2), scoreBottom, 0);
+
+        // the divider stops below the scoreboard, which would otherwise look cut in two
+        dividerQuad.updateGeometry(DIVIDER_WIDTH, Math.max(0, scoreBottom));
+        divider.updateModelBound();
+        divider.setLocalTranslation(Math.round(w / 2f - DIVIDER_WIDTH / 2), 0, -1);
 
         leftPanel.setText(sideText(names[0], left, a));
         leftPanel.layout(w, h);
@@ -167,6 +174,10 @@ public final class DuelHud extends BaseAppState {
 
     private static String sideText(String name, Simulation sim, Summary summary) {
         StringBuilder sb = new StringBuilder(HudText.WHITE).append(name);
+        if (!name.equals(sim.controller().name())) {
+            // a label or "Left"/"Right": still say which controller runs on this side
+            sb.append(HudText.GREY).append(" (").append(sim.controller().name()).append(')');
+        }
         String controllerStatus = sim.controller().status();
         if (!controllerStatus.isBlank()) {
             sb.append(HudText.GREY).append(" - ").append(controllerStatus);

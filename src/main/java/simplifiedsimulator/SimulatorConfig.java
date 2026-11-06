@@ -30,6 +30,7 @@ import simplifiedsimulator.render.RenderQuality;
  * @param camera      initial camera viewpoint
  * @param screenshot  save a screenshot to this file after {@code duration} seconds and exit, or {@code null}
  * @param duel        two controllers to show side by side, or an empty list for the normal single view
+ * @param names       labels for the two duel sides, or an empty list to use the controller names
  */
 public record SimulatorConfig(
         String controller,
@@ -47,7 +48,11 @@ public record SimulatorConfig(
         Path csv,
         CameraRig.Preset camera,
         Path screenshot,
-        List<String> duel) {
+        List<String> duel,
+        List<String> names) {
+
+    /** Longest label for a duel side, so the scoreboard headline stays on screen. */
+    public static final int MAX_NAME_LENGTH = 20;
 
     public static final String DEFAULT_HOST = "localhost";
     public static final int DEFAULT_PORT = 1337;
@@ -64,6 +69,7 @@ public record SimulatorConfig(
               --seed <number>      random seed; the same seed gives the same traffic (default 1)
               --duel <a>,<b>       two controllers side by side on the same traffic,
                                    for example actuated,external (default quality medium)
+              --names <a>,<b>      labels for the two duel sides, for example 2014,Smart
 
             External traffic light controller
               --host <name>        controller host (default localhost)
@@ -123,6 +129,31 @@ public record SimulatorConfig(
         }
         duel = List.copyOf(Objects.requireNonNull(duel, "duel"));
         validateDuel(duel, headless, port);
+        names = List.copyOf(Objects.requireNonNull(names, "names"));
+        validateNames(names, !duel.isEmpty());
+    }
+
+    private static void validateNames(List<String> names, boolean duel) {
+        if (names.isEmpty()) {
+            return;
+        }
+        if (!duel) {
+            throw new IllegalArgumentException("--names labels the sides of a --duel");
+        }
+        if (names.size() != 2) {
+            throw new IllegalArgumentException("--names needs exactly two labels, for example 2014,Smart");
+        }
+        for (String name : names) {
+            if (name.isBlank() || name.length() > MAX_NAME_LENGTH) {
+                throw new IllegalArgumentException("A --names label must be 1 to " + MAX_NAME_LENGTH
+                        + " characters, got '" + name + "'");
+            }
+            // the scoreboard font has the printable ASCII characters only
+            if (!name.chars().allMatch(c -> c >= 32 && c <= 126)) {
+                throw new IllegalArgumentException("A --names label can only use plain letters, digits and "
+                        + "punctuation, got '" + name + "'");
+            }
+        }
     }
 
     private static void validateDuel(List<String> duel, boolean headless, int port) {
@@ -174,7 +205,7 @@ public record SimulatorConfig(
 
     public static SimulatorConfig defaults() {
         return new SimulatorConfig("actuated", DEFAULT_HOST, DEFAULT_PORT, 7.5 * 3600, LocalDate.now(), 1, 1, null, 1,
-                RenderQuality.HIGH, false, 0, null, CameraRig.Preset.OVERVIEW, null, List.of());
+                RenderQuality.HIGH, false, 0, null, CameraRig.Preset.OVERVIEW, null, List.of(), List.of());
     }
 
     /**
@@ -201,6 +232,7 @@ public record SimulatorConfig(
         CameraRig.Preset camera = d.camera;
         Path screenshot = null;
         List<String> duel = List.of();
+        List<String> names = List.of();
         boolean qualityGiven = false;
         boolean controllerGiven = false;
 
@@ -212,6 +244,7 @@ public record SimulatorConfig(
                     controllerGiven = true;
                 }
                 case "--duel" -> duel = parseDuel(value(args, ++i, arg));
+                case "--names" -> names = Arrays.stream(value(args, ++i, arg).split(",", -1)).map(String::trim).toList();
                 case "--host" -> host = value(args, ++i, arg);
                 case "--port" -> port = (int) number(args, ++i, arg);
                 case "--start" -> start = parseTime(value(args, ++i, arg));
@@ -241,7 +274,7 @@ public record SimulatorConfig(
             quality = RenderQuality.MEDIUM;
         }
         return new SimulatorConfig(controller, host, port, start, date, speed, scale, demand, seed, quality, headless,
-                duration, csv, camera, screenshot, duel);
+                duration, csv, camera, screenshot, duel, names);
     }
 
     private static List<String> parseDuel(String text) {

@@ -24,10 +24,26 @@ class HudTextTest {
                 new Summary(100, 80, 1.6, Double.NaN, 50, 25, 8, 0, 0, 0, 0), 9);
         String table = HudText.duelTable(a, b);
         assertTrue(table.startsWith(HudText.GREEN + "Vehicle actuated leads: 50% less vehicle delay"), table);
-        assertTrue(table.contains("Vehicle actuated") && table.contains("Fixed time"));
+        // the leader is named in the headline; the columns are headed left and right
+        assertTrue(table.contains("left") && table.contains("right"), table);
         assertTrue(table.contains(HudText.GREEN + String.format("%8s", "40 s")), table);
         assertTrue(table.contains(HudText.WHITE + String.format("%8s", "80 s")), table);
         assertFalse(table.contains("NaN"), table);
+    }
+
+    @Test
+    void duelTableColumnsLineUpUnderTheirHeadings() {
+        Summary some = new Summary(100, 40, 1.2, 30, 30, 20, 8, 0, 0, 0, 0);
+        String table = HudText.duelTable(new DuelScore.Side("External controller (left)", some, 4),
+                new DuelScore.Side("External controller (right)", some, 9));
+        // strip jME's colour tags, which look like \#9aa3ad#
+        List<String> lines = table.lines().map(l -> l.replaceAll("\\\\#[0-9a-f]{6}#", "")).toList();
+        String header = lines.get(1);
+        assertTrue(header.contains("left") && header.contains("right"), header);
+        // every line under the headline has the width of the rows, so the panel stays compact
+        for (String line : lines.subList(1, lines.size())) {
+            assertEquals(lines.get(2).length(), line.length(), "'" + line + "'");
+        }
     }
 
     @Test

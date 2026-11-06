@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. The project follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-11-06
+
+### Fixed
+- In a duel window the two halves could show different spots: jME's post-processor draws a
+  multisampled half-window view port in the wrong place. A duel now uses FXAA instead of
+  multisampling.
+- The duel scoreboard got as wide as the controller names, and with two external controllers
+  the names no longer lined up with their columns. The columns are now headed left and right,
+  identical controllers are called Left and Right, and the divider stops below the scoreboard.
+
+### Added
+- `--names <a>,<b>` labels the two sides of a duel.
+
 ## [1.2.0] - 2026-11-06
 
 ### Added

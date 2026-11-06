@@ -106,6 +106,26 @@ class SimulatorConfigTest {
     }
 
     @Test
+    void parsesNamesForTheDuelSides() {
+        SimulatorConfig c = SimulatorConfig.parse("--duel", "external,external", "--names", " 2014 , Smart ");
+        assertEquals(List.of("2014", "Smart"), c.names());
+        assertEquals(List.of(), SimulatorConfig.parse("--duel", "actuated,fixed").names());
+    }
+
+    @Test
+    void rejectsInvalidNames() {
+        for (String[] args : List.of(
+                new String[] {"--names", "a,b"},
+                new String[] {"--duel", "actuated,fixed", "--names", "only-one"},
+                new String[] {"--duel", "actuated,fixed", "--names", "a,b,c"},
+                new String[] {"--duel", "actuated,fixed", "--names", "a, "},
+                new String[] {"--duel", "actuated,fixed", "--names", "a,this name is far too long to fit"},
+                new String[] {"--duel", "actuated,fixed", "--names", "a,café"})) {
+            assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse(args), String.join(" ", args));
+        }
+    }
+
+    @Test
     void sideOutsideTheDuelIsRejected() {
         SimulatorConfig c = SimulatorConfig.parse("--duel", "actuated,fixed");
         assertThrows(IllegalArgumentException.class, () -> c.portFor(2));

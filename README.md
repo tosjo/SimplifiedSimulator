@@ -80,6 +80,7 @@ standalone copy with start scripts in `build/install/simplified-simulator/`.
 | `--headless --duration <sec>` | | Run without a window and print the results (`--csv <file>` to save them) |
 | `--screenshot <file> --duration <sec>` | | Simulate, save one picture and exit |
 | `--duel <a>,<b>` | | Two controllers side by side on the same traffic (see below) |
+| `--names <a>,<b>` | controller names | Labels for the two duel sides, for example `2014,Smart` |
 
 ## Comparing controllers
 
@@ -108,7 +109,9 @@ Two external controllers listen on `--port` and the next port (1337 and 1338 by 
 for example two copies of the Python controller started with `--port 1337` and
 `--port 1338`. With an external controller neither side gets the usual warm-up, so both
 start from an empty crossing. A duel draws the city twice, so it starts at medium quality;
-`--quality high` overrides that.
+`--quality high` overrides that. It smooths edges with FXAA instead of multisampling, because
+jME draws a multisampled half-window in the wrong place. `--names 2014,Smart` labels the two
+sides; two controllers of the same kind are otherwise called Left and Right.
 
 ### Batch runner
 

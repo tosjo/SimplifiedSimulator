@@ -104,8 +104,9 @@ final class HudText {
         String headline = DuelScore.headline(a, b);
         String colour = headline.contains(" leads: ") ? GREEN : headline.startsWith("warming") ? GREY : WHITE;
         StringBuilder sb = new StringBuilder(colour).append(headline).append('\n');
-        sb.append(GREY).append("left  ").append(WHITE).append(a.name()).append(GREY).append("   vs   right  ")
-                .append(WHITE).append(b.name()).append('\n');
+        // short column headings keep the panel as narrow as the rows; the names are in the
+        // headline and in each side's own panel
+        sb.append(GREY).append(String.format(Locale.ROOT, "%-18s%8s   %8s", "", "left", "right")).append('\n');
         for (DuelScore.Row r : DuelScore.rows(a, b)) {
             sb.append(GREY).append(String.format(Locale.ROOT, "%-18s", r.label()))
                     .append(r.better() == DuelScore.Better.A ? GREEN : WHITE).append(String.format(Locale.ROOT, "%8s", r.a()))
