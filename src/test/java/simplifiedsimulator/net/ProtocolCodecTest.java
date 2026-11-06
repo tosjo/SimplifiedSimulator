@@ -48,4 +48,52 @@ class ProtocolCodecTest {
             assertEquals(state, LightState.fromCode(state.code()));
         }
     }
+
+    @Test
+    void decodesTheNameAControllerAnnounces() {
+        assertEquals(java.util.Optional.of("Smart"), ProtocolCodec.decodeName("{\"controllername\":{\"name\":\"Smart\"}}"));
+        assertEquals(java.util.Optional.of("2014 controller"),
+                ProtocolCodec.decodeName("{\"ControllerName\":{\"Name\":\"  2014 controller \"}}"));
+    }
+
+    @Test
+    void ignoresNamesThatAreMissingTooLongOrNotPlainText() {
+        for (String bad : new String[] {"{\"controllername\":{}}", "{\"controllername\":{\"name\":\"\"}}",
+                "{\"controllername\":{\"name\":\"a name that is much too long\"}}",
+                "{\"controllername\":{\"name\":\"café\"}}", "{\"controllername\":{\"name\":7}}",
+                "{\"controllername\":\"x\"}", "{\"lightstate\":{\"id\":2,\"state\":2}}", "not json", "[]"}) {
+            assertTrue(ProtocolCodec.decodeName(bad).isEmpty(), bad);
+        }
+    }
+
+    @Test
+    void encodesTheClockForLockstep() {
+        assertEquals("{\"clock\":{\"time\":12.3}}", ProtocolCodec.encodeClock(12.3));
+    }
+
+    @Test
+    void decodesTheControllersClockReply() {
+        assertEquals(java.util.OptionalDouble.of(12.3), ProtocolCodec.decodeClockDone("{\"clockdone\":{\"time\":12.3}}"));
+        assertEquals(java.util.OptionalDouble.of(4.0), ProtocolCodec.decodeClockDone("{\"ClockDone\":{\"Time\":4}}"));
+        for (String bad : new String[] {"{\"clockdone\":{}}", "{\"clockdone\":{\"time\":\"x\"}}", "not json",
+                "{\"lightstate\":{\"id\":2,\"state\":2}}"}) {
+            assertTrue(ProtocolCodec.decodeClockDone(bad).isEmpty(), bad);
+        }
+    }
+
+    @Test
+    void encodesALoopBecomingFree() {
+        assertEquals("{\"sensorfree\":{\"id\":3}}", ProtocolCodec.encodeSensorFree(3));
+    }
+
+    @Test
+    void decodesTheFeaturesAControllerAsksFor() {
+        assertEquals(java.util.Optional.of(java.util.Set.of("sensorfree")),
+                ProtocolCodec.decodeFeatures("{\"Features\":[\"SensorFree\"]}"));
+        assertEquals(java.util.Optional.of(java.util.Set.of()), ProtocolCodec.decodeFeatures("{\"features\":[]}"));
+        for (String bad : new String[] {"{\"features\":\"sensorfree\"}", "{\"features\":[3]}", "nope",
+                "{\"sensorstate\":{\"id\":2}}"}) {
+            assertTrue(ProtocolCodec.decodeFeatures(bad).isEmpty(), bad);
+        }
+    }
 }

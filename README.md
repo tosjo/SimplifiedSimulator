@@ -193,9 +193,50 @@ instead. It does not hear about the simulator's clock, so if you speed the simul
 start the controller with the same `--speed` (and don't change the speed while they run).
 
 To make your own controller, edit the settings at the top of the file: the phases (which
-groups may be green together), the green times and the intergreen table. It refuses to start
-a plan that would give conflicting groups green together. Its tests run with
-`python -m unittest discover -s tools/controller`.
+groups may be green together) and the green times; the conflict and intergreen table and
+the protocol live in [`shared.py`](tools/controller/shared.py). It refuses to start a plan
+that would give conflicting groups green together. The tests of all Python controllers run
+with `python -m unittest discover -s tools/controller`.
+
+### The 2014 controller against the smart one
+
+Two more controllers sit next to it:
+
+- [`original2014.py`](tools/controller/original2014.py), port 1337: our original 2014 C#
+  controller, ported second by second (request queue, at most three groups at a time, 7-12 s
+  green, everything red before the next set), but with today's group numbers and conflicts.
+- [`smart.py`](tools/controller/smart.py), port 1338: the fastest controller we could make.
+  It is the built-in vehicle-actuated logic plus a variable minimum green from the queue
+  counted at red, rest in green, the module with the longest total wait going next, higher
+  maximum greens and a sharper bus priority. It asks for free reports, so it knows who is
+  standing on a loop.
+
+```sh
+python tools/controller/original2014.py
+python tools/controller/smart.py
+./gradlew run --args="--duel external,external --start 07:30"
+```
+
+One hour of morning and evening rush, three seeds each (lockstep, `./gradlew showdown`):
+
+| Controller | Vehicle delay | Stops | Buses | Cyclists | Pedestrians |
+| --- | --- | --- | --- | --- | --- |
+| Smart | 61-63 s | 0.97 | 35-37 s | 61 s | 38-42 s |
+| Built-in vehicle actuated | 81-89 s | 1.27 | 28-34 s | 58-72 s | 36-41 s |
+| 2014 controller | far over capacity: 1508 vehicles in the morning hour instead of 2300 | | | | |
+
+At 200% traffic (`F7`) the smart controller moves 20% more vehicles than the built-in one.
+
+### Measuring a controller
+
+`./gradlew showdown` runs one controller for a while without a window and prints the
+results, also per movement. An external controller runs in lockstep, so the result does not
+depend on timing or network delays, repeats exactly, and an hour takes about half a minute:
+
+```sh
+python tools/controller/smart.py --port 1400 &
+./gradlew showdown --args="--controller external --port 1400 --start 07:00 --duration 3600 --seed 1"
+```
 
 ### External controller protocol
 
@@ -215,8 +256,29 @@ To switch a group, the controller sends this, with `state` `0` for red, `1` for 
 {"lightstate":{"id":2,"state":2}}
 ```
 
+A controller may also say who it is, once, so the simulator shows its name (1 to 20 plain
+characters) instead of "External controller", for example on the duel scoreboard:
+
+```json
+{"controllername":{"name":"Smart"}}
+```
+
+A controller that also wants to know when a loop becomes free again (so it knows who is
+still standing on it) asks for it once; from then on it also gets `sensorfree` messages:
+
+```json
+{"features":["sensorfree"]}
+{"sensorfree":{"id":2}}
+```
+
+For measuring, the simulator has a lockstep mode (used by `./gradlew showdown`): after each
+step's sensor messages it sends `{"clock":{"time":12.3}}` and waits until the controller has
+sent its light states and `{"clockdone":{"time":12.3}}`. The first lockstep step starts with
+one clock message before any sensor message. Controllers that never see a clock message work
+as before.
+
 This is the protocol of the original 2014 project, so its controllers still work, with the
-new group numbers.
+new group numbers; the name message is optional.
 
 ## Project layout
 

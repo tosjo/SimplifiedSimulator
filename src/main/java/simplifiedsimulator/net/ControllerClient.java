@@ -10,7 +10,11 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.DoubleConsumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -30,15 +34,44 @@ public final class ControllerClient implements AutoCloseable {
     private final String host;
     private final int port;
     private final Consumer<LightUpdate> listener;
+    private final Consumer<String> nameListener;
+    private final DoubleConsumer clockListener;
+    private final Consumer<Set<String>> featureListener;
 
     private Socket socket;
     private Writer out;
     private volatile boolean connected;
 
     public ControllerClient(String host, int port, Consumer<LightUpdate> listener) {
+        this(host, port, listener, name -> { });
+    }
+
+    /**
+     * @param nameListener gets the name the controller announces, on the reading thread
+     */
+    public ControllerClient(String host, int port, Consumer<LightUpdate> listener, Consumer<String> nameListener) {
+        this(host, port, listener, nameListener, time -> { });
+    }
+
+    /**
+     * @param clockListener gets the controller's lockstep replies (the simulated time it answers)
+     */
+    public ControllerClient(String host, int port, Consumer<LightUpdate> listener, Consumer<String> nameListener,
+                            DoubleConsumer clockListener) {
+        this(host, port, listener, nameListener, clockListener, features -> { });
+    }
+
+    /**
+     * @param featureListener gets the optional features the controller asks for
+     */
+    public ControllerClient(String host, int port, Consumer<LightUpdate> listener, Consumer<String> nameListener,
+                            DoubleConsumer clockListener, Consumer<Set<String>> featureListener) {
+        this.featureListener = Objects.requireNonNull(featureListener, "featureListener");
         this.host = Objects.requireNonNull(host, "host");
         this.port = port;
         this.listener = Objects.requireNonNull(listener, "listener");
+        this.nameListener = Objects.requireNonNull(nameListener, "nameListener");
+        this.clockListener = Objects.requireNonNull(clockListener, "clockListener");
     }
 
     /**
@@ -52,6 +85,8 @@ public final class ControllerClient implements AutoCloseable {
         }
         try {
             Socket newSocket = new Socket();
+            // the messages are tiny and time-critical: send them at once instead of batching
+            newSocket.setTcpNoDelay(true);
             newSocket.connect(new InetSocketAddress(host, port), CONNECT_TIMEOUT_MS);
             socket = newSocket;
             out = new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8);
@@ -124,13 +159,31 @@ public final class ControllerClient implements AutoCloseable {
         if (message.isBlank()) {
             return;
         }
-        ProtocolCodec.decodeLight(message).ifPresentOrElse(update -> {
-            try {
-                listener.accept(update);
-            } catch (RuntimeException e) {
-                LOG.log(Level.WARNING, "Error while handling " + message, e);
+        try {
+            Optional<LightUpdate> light = ProtocolCodec.decodeLight(message);
+            if (light.isPresent()) {
+                listener.accept(light.get());
+                return;
             }
-        }, () -> LOG.warning(() -> "Ignoring unrecognised message: " + message));
+            OptionalDouble clock = ProtocolCodec.decodeClockDone(message);
+            if (clock.isPresent()) {
+                clockListener.accept(clock.getAsDouble());
+                return;
+            }
+            Optional<String> name = ProtocolCodec.decodeName(message);
+            if (name.isPresent()) {
+                nameListener.accept(name.get());
+                return;
+            }
+            Optional<Set<String>> features = ProtocolCodec.decodeFeatures(message);
+            if (features.isPresent()) {
+                featureListener.accept(features.get());
+                return;
+            }
+            LOG.warning(() -> "Ignoring unrecognised message: " + message);
+        } catch (RuntimeException e) {
+            LOG.log(Level.WARNING, "Error while handling " + message, e);
+        }
     }
 
     @Override

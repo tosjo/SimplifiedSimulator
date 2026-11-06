@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "simplifiedsimulator"
-version = "1.3.0"
+version = "1.4.0"
 
 repositories {
     mavenCentral()
@@ -45,6 +45,15 @@ application {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+// Measures one controller without a window; external controllers run in lockstep, for example:
+//   ./gradlew showdown --args="--controller external --port 1338 --start 07:00 --duration 3600"
+tasks.register<JavaExec>("showdown") {
+    group = "verification"
+    description = "Measures one signal controller (also an external one) without graphics."
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("simplifiedsimulator.ShowdownRunner")
 }
 
 // Headless comparison of signal controllers, for example:

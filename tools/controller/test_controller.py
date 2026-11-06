@@ -183,6 +183,38 @@ class ProtocolTest(unittest.TestCase):
             with self.subTest(bad=bad):
                 self.assertIsNone(c.parse_sensor(bad))
 
+    def test_parses_the_lockstep_clock(self):
+        self.assertEqual(12.3, c.parse_clock('{"clock":{"time":12.3}}'))
+        for bad in ['{"clock":{}}', '{"clock":{"time":"x"}}', '{"sensorstate":{"id":2}}', "nope",
+                    '{"clock":{"time":true}}']:
+            with self.subTest(bad=bad):
+                self.assertIsNone(c.parse_clock(bad))
+
+    def test_parses_a_free_loop(self):
+        self.assertEqual(24, c.parse_sensor_free('{"sensorfree":{"id":24}}'))
+        for bad in ['{"sensorfree":{}}', '{"sensorstate":{"id":2}}', '{"sensorfree":{"id":true}}', "nope"]:
+            with self.subTest(bad=bad):
+                self.assertIsNone(c.parse_sensor_free(bad))
+
+    def test_encodes_the_features_message(self):
+        self.assertEqual({"features": ["sensorfree"]}, json.loads(c.encode_features(["sensorfree"])[:-1]))
+
+    def test_encodes_the_clock_reply(self):
+        self.assertEqual({"clockdone": {"time": 12.3}}, json.loads(c.encode_clockdone(12.3)[:-1]))
+
+    def test_encodes_a_name_message_with_terminator(self):
+        raw = c.encode_name("Smart")
+        self.assertTrue(raw.endswith(b"\0"))
+        self.assertEqual({"controllername": {"name": "Smart"}}, json.loads(raw[:-1]))
+
+    def test_every_controller_has_a_short_plain_name(self):
+        import original2014
+        import smart
+        names = [c.Controller.NAME, original2014.Original2014Controller.NAME, smart.SmartController.NAME]
+        self.assertEqual(len(names), len(set(names)), "names tell the controllers apart")
+        for name in names:
+            self.assertTrue(0 < len(name) <= 20 and name.isascii(), name)
+
     def test_encodes_a_light_message_with_terminator(self):
         raw = c.encode_light(2, c.GREEN)
         self.assertTrue(raw.endswith(b"\0"))
@@ -204,13 +236,47 @@ class ServerTest(unittest.TestCase):
                 sim.sendall(b'{"sensorstate":{"id":2}}\0garbage\0')
                 while not any(m == {"lightstate": {"id": 2, "state": 2}} for m in received):
                     received.extend(json.loads(m) for m in framer.feed(sim.recv(4096)))
-                startup = received[:len(c.INTERGREEN)]
+                self.assertEqual({"controllername": {"name": "Python controller"}}, received[0],
+                                 "the controller says who it is first")
+                startup = received[1:1 + len(c.INTERGREEN)]
                 self.assertTrue(all(m["lightstate"]["state"] == c.RED for m in startup))
             finally:
                 sim.close()
                 session.join(5)
                 ctrl_side.close()
         self.assertFalse(session.is_alive(), "the session should end when the simulator disconnects")
+
+    def test_lockstep_session_runs_on_simulated_time_and_answers_every_clock(self):
+        sim, ctrl_side = socket.socketpair()
+        wall_clock = time.monotonic  # real time barely moves while 15 simulated seconds pass
+        with contextlib.redirect_stdout(io.StringIO()):
+            session = threading.Thread(target=c.serve, args=(ctrl_side, wall_clock, False, False))
+            session.start()
+            try:
+                sim.settimeout(5)
+                framer = c.Framer()
+                received = []
+
+                def step(t, sensors=()):
+                    sim.sendall(b"".join(b'{"sensorstate":{"id":%d}}\0' % g for g in sensors)
+                                + b'{"clock":{"time":%.1f}}\0' % t)
+                    while not received or received[-1] != {"clockdone": {"time": round(t, 1)}}:
+                        received.extend(json.loads(m) for m in framer.feed(sim.recv(4096)))
+
+                step(0.0)  # like the simulator: a first clock on its own starts lockstep
+                step(0.0, sensors=[2])
+                for i in range(1, 151):
+                    step(i / 10)
+                greens = [i for i, m in enumerate(received) if m == {"lightstate": {"id": 2, "state": 2}}]
+                self.assertEqual(1, len(greens))
+                answered = [m["clockdone"]["time"] for m in received[:greens[0]] if "clockdone" in m]
+                # green after the longest clearance into 02 (8.9 s), counted in simulated time
+                self.assertAlmostEqual(max(c.INTERGREEN[o][2] for o in c.INTERGREEN[2]), answered[-1] + 0.1,
+                                       delta=0.11)
+            finally:
+                sim.close()
+                session.join(5)
+                ctrl_side.close()
 
     def test_reports_a_port_that_is_in_use(self):
         blocker = c.open_server("localhost", 0)

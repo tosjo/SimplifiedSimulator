@@ -104,14 +104,16 @@ final class HudText {
         String headline = DuelScore.headline(a, b);
         String colour = headline.contains(" leads: ") ? GREEN : headline.startsWith("warming") ? GREY : WHITE;
         StringBuilder sb = new StringBuilder(colour).append(headline).append('\n');
-        // short column headings keep the panel as narrow as the rows; the names are in the
-        // headline and in each side's own panel
-        sb.append(GREY).append(String.format(Locale.ROOT, "%-18s%8s   %8s", "", "left", "right")).append('\n');
+        // each column is headed by its controller and its side, and is as wide as the longer name
+        String cell = "%" + Math.max(8, Math.max(a.name().length(), b.name().length())) + "s";
+        String columns = "%-18s" + cell + "   " + cell;
+        sb.append(WHITE).append(String.format(Locale.ROOT, columns, "", a.name(), b.name())).append('\n');
+        sb.append(GREY).append(String.format(Locale.ROOT, columns, "", "left", "right")).append('\n');
         for (DuelScore.Row r : DuelScore.rows(a, b)) {
             sb.append(GREY).append(String.format(Locale.ROOT, "%-18s", r.label()))
-                    .append(r.better() == DuelScore.Better.A ? GREEN : WHITE).append(String.format(Locale.ROOT, "%8s", r.a()))
+                    .append(r.better() == DuelScore.Better.A ? GREEN : WHITE).append(String.format(Locale.ROOT, cell, r.a()))
                     .append("   ")
-                    .append(r.better() == DuelScore.Better.B ? GREEN : WHITE).append(String.format(Locale.ROOT, "%8s", r.b()))
+                    .append(r.better() == DuelScore.Better.B ? GREEN : WHITE).append(String.format(Locale.ROOT, cell, r.b()))
                     .append('\n');
         }
         return sb.toString().stripTrailing();
