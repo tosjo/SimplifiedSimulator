@@ -85,6 +85,7 @@ public final class Simulation implements SimulationView {
     private double demandScale;
     private double time;
     private long nextId = 1;
+    private long arrivals;
     private double nextSample = 60;
     private double nextQueueUpdate;
     private int redLightRuns;
@@ -243,6 +244,11 @@ public final class Simulation implements SimulationView {
         return geometry.get(route);
     }
 
+    /** Road users generated so far, including those still waiting to enter the network. */
+    public long arrivals() {
+        return arrivals;
+    }
+
     /** Road users that crossed a stop line while their light was red. */
     public int redLightRuns() {
         return redLightRuns;
@@ -306,7 +312,10 @@ public final class Simulation implements SimulationView {
     // ---------------------------------------------------------------------------------------
 
     private void spawn(double dt) {
-        generator.generate(timeOfDay(), dt, demandScale, (route, type) -> entryQueues.get(route).addLast(type));
+        generator.generate(timeOfDay(), dt, demandScale, (route, type) -> {
+            entryQueues.get(route).addLast(type);
+            arrivals++;
+        });
         for (Map.Entry<Route, ArrayDeque<AgentType>> e : entryQueues.entrySet()) {
             ArrayDeque<AgentType> queue = e.getValue();
             if (!queue.isEmpty() && tryInsert(e.getKey(), queue.peekFirst())) {

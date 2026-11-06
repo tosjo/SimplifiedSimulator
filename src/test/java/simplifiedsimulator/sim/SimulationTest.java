@@ -26,6 +26,18 @@ class SimulationTest {
     }
 
     @Test
+    void sameSeedGivesTheSameArrivalsWhateverTheController() {
+        Simulation a = new Simulation(NETWORK, SimulationOptions.defaults().withSeed(3));
+        Simulation b = new Simulation(NETWORK, SimulationOptions.defaults().withSeed(3));
+        a.setController(SignalControllers.create("actuated", "localhost", 1));
+        b.setController(SignalControllers.create("fixed", "localhost", 1));
+        a.run(900);
+        b.run(900);
+        assertTrue(a.arrivals() > 100, "expected a busy crossing, got " + a.arrivals());
+        assertEquals(a.arrivals(), b.arrivals());
+    }
+
+    @Test
     void carsStopAtARedLight() {
         Simulation sim = only(Map.of("W2_T", 600.0), 1);
         sim.setController(TestControllers.allRed());
