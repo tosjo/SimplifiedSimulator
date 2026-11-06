@@ -34,6 +34,17 @@ public final class DuelScore {
     private DuelScore() {
     }
 
+    /**
+     * Names for the two sides: the labels from the command line if given, else the controller
+     * names, or "Left" and "Right" when both sides run the same kind of controller.
+     */
+    public static List<String> sideNames(String controllerA, String controllerB, List<String> labels) {
+        if (labels.size() == 2) {
+            return List.copyOf(labels);
+        }
+        return controllerA.equals(controllerB) ? List.of("Left", "Right") : List.of(controllerA, controllerB);
+    }
+
     public static List<Row> rows(Side a, Side b) {
         Summary x = a.summary();
         Summary y = b.summary();

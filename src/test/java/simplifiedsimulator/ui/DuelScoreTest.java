@@ -95,6 +95,24 @@ class DuelScoreTest {
     }
 
     @Test
+    void sidesKeepTheirControllerNamesWhenTheyDiffer() {
+        assertEquals(List.of("Vehicle actuated", "Fixed time"),
+                DuelScore.sideNames("Vehicle actuated", "Fixed time", List.of()));
+    }
+
+    @Test
+    void identicalControllersAreCalledLeftAndRight() {
+        assertEquals(List.of("Left", "Right"),
+                DuelScore.sideNames("External controller", "External controller", List.of()));
+    }
+
+    @Test
+    void namesFromTheCommandLineWin() {
+        assertEquals(List.of("2014", "Smart"),
+                DuelScore.sideNames("External controller", "External controller", List.of("2014", "Smart")));
+    }
+
+    @Test
     void anySafetyCounterMakesASideUnsafe() {
         assertFalse(DuelScore.unsafe(new Summary(1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0)));
         assertTrue(DuelScore.unsafe(new Summary(1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0)));

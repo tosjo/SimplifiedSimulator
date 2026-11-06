@@ -128,12 +128,21 @@ public final class Main {
         start(new SimplifiedSimulator(config, simulation), config, "Simplified Simulator - Harlingerstraatweg, Leeuwarden");
     }
 
+    /**
+     * Multisampling for the window. A screenshot is one frame and needs none. A duel gets none
+     * either: jME's post-processor draws a multisampled half-window view port in the wrong
+     * place, so the duel relies on the FXAA filter for smooth edges instead.
+     */
+    static int samples(SimulatorConfig config) {
+        return config.screenshot() != null || config.isDuel() ? 1 : 4;
+    }
+
     private static void start(SimpleApplication app, SimulatorConfig config, String title) {
         AppSettings settings = new AppSettings(true);
         settings.setTitle(title);
         settings.setResolution(1600, 900);
         settings.setResizable(true);
-        settings.setSamples(config.screenshot() != null ? 1 : 4);
+        settings.setSamples(samples(config));
         settings.setVSync(true);
         settings.setGammaCorrection(false);
         // The simulation has no sound; skipping OpenAL also avoids failures on

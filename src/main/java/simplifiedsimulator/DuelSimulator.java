@@ -99,7 +99,8 @@ final class DuelSimulator extends SimpleApplication implements ActionListener {
 
         boolean screenshot = config.screenshot() != null;
         hud = new DuelHud(left, right,
-                () -> screenshot ? new AppStatus(clock.speed(), false, -1) : new AppStatus(clock.speed(), clock.paused(), fps));
+                () -> screenshot ? new AppStatus(clock.speed(), false, -1) : new AppStatus(clock.speed(), clock.paused(), fps),
+                config.names());
         stateManager.attach(hud);
 
         if (screenshot) {
