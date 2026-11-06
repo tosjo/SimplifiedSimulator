@@ -24,6 +24,7 @@ import urllib.request
 
 import mapbox_earcut as earcut
 import numpy as np
+from scipy.spatial import ConvexHull
 
 ORIGIN = (180440.0, 579965.0)
 API = "https://api.3dbag.nl/collections/pand/items"
@@ -75,6 +76,7 @@ def triangulate(ring_points):
 
 
 def building_triangles(feature, transform):
+    """Triangles of a building's detailed (LoD 2.2) solid, plus its attributes."""
     scale, translate = transform["scale"], transform["translate"]
     verts = np.array(feature["vertices"], dtype=np.float64) * scale + translate
     verts[:, 0] -= ORIGIN[0]
@@ -101,6 +103,31 @@ def building_triangles(feature, transform):
     return out, attrs
 
 
+def convex_glass_shape(tris):
+    """
+    A clean, convex version of a glass building. The laser scan partly goes through glass,
+    which leaves deep spikes in the reconstructed roof; glass halls such as Crystallic are
+    convex, so the hull of the measured points (minus the top 1% outliers) is a faithful
+    shape. Faces looking up become roof, the rest walls; the floor is dropped.
+    """
+    pts = np.concatenate([t[1] for t in tris])
+    pts = pts[pts[:, 2] <= np.percentile(pts[:, 2], 99)]
+    base = pts.copy()
+    base[:, 2] = 0.0
+    pts = np.unique(np.round(np.concatenate([pts, base]), 2), axis=0)
+    hull = ConvexHull(pts)
+    out = []
+    for simplex, eq in zip(hull.simplices, hull.equations):
+        normal = eq[:3]
+        if normal[2] < -0.5:
+            continue
+        tri = pts[simplex]
+        if np.dot(np.cross(tri[1] - tri[0], tri[2] - tri[0]), normal) < 0:
+            tri = tri[[0, 2, 1]]
+        out.append((0 if normal[2] > 0.3 else 1, tri))
+    return out
+
+
 def main():
     radius, path = float(sys.argv[1]), sys.argv[2]
     buildings = []
@@ -119,6 +146,8 @@ def main():
                 if xy[:, 0].min() < lx < xy[:, 0].max() and xy[:, 1].min() < ly < xy[:, 1].max() \
                         and math.hypot(centre[0] - lx, centre[1] - ly) < 120:
                     glass = True
+        if glass:
+            tris = convex_glass_shape(tris)
         height = float(attrs.get("b3_h_dak_max") or 0) - float(attrs.get("b3_h_maaiveld") or 0)
         year = int(attrs.get("oorspronkelijkbouwjaar") or 0)
         buildings.append((glass, height, year, tris))
