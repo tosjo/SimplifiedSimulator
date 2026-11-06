@@ -278,6 +278,29 @@ class ServerTest(unittest.TestCase):
                 session.join(5)
                 ctrl_side.close()
 
+    def test_once_stops_after_the_simulator_disconnects(self):
+        probe = c.open_server("localhost", 0)
+        port = probe.getsockname()[1]
+        probe.close()
+        result = []
+        with contextlib.redirect_stdout(io.StringIO()):
+            runner = threading.Thread(target=lambda: result.append(c.main(["--port", str(port), "--once"])))
+            runner.start()
+            deadline = time.monotonic() + 5
+            while True:
+                try:
+                    sim = socket.create_connection(("localhost", port), timeout=1)
+                    break
+                except OSError:
+                    if time.monotonic() > deadline:
+                        raise
+                    time.sleep(0.05)
+            sim.recv(4096)  # name and startup lights
+            sim.close()
+            runner.join(5)
+        self.assertFalse(runner.is_alive(), "the controller stopped by itself")
+        self.assertEqual([0], result)
+
     def test_reports_a_port_that_is_in_use(self):
         blocker = c.open_server("localhost", 0)
         port = blocker.getsockname()[1]

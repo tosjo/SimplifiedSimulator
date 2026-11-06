@@ -242,6 +242,8 @@ def argument_parser(description, default_port):
     parser.add_argument("--tick", type=float, default=0.05,
                         help="seconds between updates; lower it for fast test runs (default: 0.05)")
     parser.add_argument("--verbose", action="store_true", help="print every light change")
+    parser.add_argument("--once", action="store_true",
+                        help="stop when the simulator disconnects, instead of waiting for it to come back")
     return parser
 
 
@@ -282,6 +284,9 @@ def run_server(args, make_controller, mode, simulator_hint):
                         serve_session(conn, clock, make_controller, args.verbose, args.tick)
                     except OSError:
                         pass  # the simulator went away mid-message; same as a normal disconnect
+                if args.once:
+                    log("Simulator disconnected. Stopped.")
+                    return 0
                 log("Simulator disconnected. Waiting for it to connect again (press R in the simulator).")
     except KeyboardInterrupt:
         log("Stopped.")

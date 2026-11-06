@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The project follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-11-07
+
+### Added
+- One click for the showdown: `./gradlew duel` (and the IntelliJ run configuration
+  **Controller Duel**) starts the 2014 and smart controllers and opens the duel at the
+  morning rush in daylight; `-PduelArgs` passes other options.
+- `--once` for the Python controllers: stop when the simulator disconnects.
+
 ## [1.4.0] - 2026-11-06
 
 ### Added

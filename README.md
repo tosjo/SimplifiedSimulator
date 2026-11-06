@@ -34,15 +34,25 @@ You need JDK 17 or newer and a graphics card with OpenGL 3.2. Gradle downloads e
 else.
 
 **IntelliJ IDEA:** *File → Open* the cloned folder. IntelliJ recognises the Gradle project;
-pick **Run Simulator** in the run configurations and press ▶.
+pick a run configuration and press ▶:
+
+- **Run Simulator**: the crossing with the built-in vehicle-actuated controller.
+- **Controller Duel**: our 2014 controller (left) against the smart controller (right), on
+  the same traffic. It starts both Python controllers for you (Python 3.8 or newer must be
+  installed) and stops them when you close the window.
 
 **Command line:**
 
 ```sh
-./gradlew run                                        # morning rush, smart controller
+./gradlew run                                        # morning rush, vehicle-actuated controller
 ./gradlew run --args="--start 17:00 --speed 4"       # evening rush, four times as fast
 ./gradlew run --args="--controller fixed"            # compare with a fixed-time plan
+./gradlew duel                                       # 2014 controller against the smart one
+./gradlew duel -PduelArgs="--start 17:00"            # the duel at the evening rush
 ```
+
+The duel runs at real speed: the Python controllers keep their own time, so leave the speed
+at 1x there. The controllers' output goes to `build/duel/`.
 
 On Windows, use `gradlew.bat` instead of `./gradlew`. `./gradlew installDist` builds a
 standalone copy with start scripts in `build/install/simplified-simulator/`.
