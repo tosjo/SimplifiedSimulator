@@ -32,11 +32,11 @@ public final class TreeBuilder {
     private final int detail;
 
     /**
-     * @param detail icosphere subdivisions for the crown blobs (1 = low, 2 = normal, 3 = high)
+     * @param detail icosphere subdivisions for the main crown blob (1 = low, 2 = normal)
      */
     public TreeBuilder(Materials materials, int detail) {
         this.materials = materials;
-        this.detail = Math.max(1, Math.min(3, detail));
+        this.detail = Math.max(1, Math.min(2, detail));
     }
 
     public Node build(List<TreeData.Tree> trees) {
@@ -89,8 +89,7 @@ public final class TreeBuilder {
             // upper lumps catch more light
             mb.color(Palette.vary(leaf, seed, 50 + i, 0.08f).mult(1.0f + 0.15f * up / crownHalfHeight));
             int lumpSeed = seed + i * 7;
-            mb.sphere(c, new Vector3f(s, Math.min(s, crownHalfHeight * 0.7f), s), Math.max(1, detail - 1),
-                    d -> lumpy(d, lumpSeed));
+            mb.sphere(c, new Vector3f(s, Math.min(s, crownHalfHeight * 0.7f), s), 1, d -> lumpy(d, lumpSeed));
         }
     }
 

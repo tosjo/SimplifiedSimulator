@@ -142,7 +142,8 @@ public final class Environment {
         shadows = new DirectionalLightShadowFilter(assets, quality.shadowMapSize(), quality.shadowSplits());
         shadows.setLight(sunLight);
         shadows.setLambda(0.7f);
-        shadows.setEdgeFilteringMode(EdgeFilteringMode.PCFPOISSON);
+        shadows.setEdgeFilteringMode(EdgeFilteringMode.PCF8);
+        shadows.setEdgesThickness(12);
         shadows.setShadowZExtend(450f);
         shadows.setShadowZFadeLength(120f);
         shadows.setRenderBackFacesShadows(false);
@@ -206,8 +207,9 @@ public final class Environment {
         sunLight.setColor(atmosphere.sun().mult(daylight ? 1.15f : 1f));
         ambientLight.setColor(atmosphere.ambient().mult(1.1f));
 
-        groundMaterial.setColor("AmbientColor", atmosphere.ambient().mult(1.05f));
-        groundMaterial.setColor("SunColor", atmosphere.sun().mult(daylight ? 0.85f : 0.6f));
+        // the photo already contains daylight: aim for its own brightness under a high sun
+        groundMaterial.setColor("AmbientColor", atmosphere.ambient().mult(0.95f));
+        groundMaterial.setColor("SunColor", atmosphere.sun().mult(daylight ? 0.62f : 0.5f));
         groundMaterial.setVector3("SunDirection", shading);
         groundMaterial.setColor("FogColor", atmosphere.fog());
         groundMaterial.setFloat("FogDensity", 0.00035f);

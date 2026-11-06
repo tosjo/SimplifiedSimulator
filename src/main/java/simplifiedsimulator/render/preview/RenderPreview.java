@@ -30,6 +30,7 @@ import simplifiedsimulator.render.RenderQuality;
  *
  * <pre>
  *   --time HH:MM            time of day (default 14:00)
+ *   --date YYYY-MM-DD       date, for the path of the sun (default today)
  *   --camera PRESET         OVERVIEW, BIRDS_EYE, STREET_WEST, STREET_EAST, STREET_NORTH, STREET_SOUTH
  *   --look x,y,h,tx,ty,th   camera at (x, y, height) looking at (tx, ty, th), network metres
  *   --follow                follow the first car that appears (chase camera)
@@ -49,7 +50,7 @@ public final class RenderPreview extends SimpleApplication {
     private double accumulator;
     private int frames;
 
-    private record Options(double time, CameraRig.Preset preset, double[] look, boolean follow, RenderQuality quality,
+    private record Options(double time, java.time.LocalDate date, CameraRig.Preset preset, double[] look, boolean follow, RenderQuality quality,
                            double warmup, int width, int height, Path screenshot) {
     }
 
@@ -77,6 +78,7 @@ public final class RenderPreview extends SimpleApplication {
 
     private static Options parse(String[] args) {
         double time = 14 * 3600;
+        java.time.LocalDate date = java.time.LocalDate.now();
         CameraRig.Preset preset = CameraRig.Preset.OVERVIEW;
         double[] look = null;
         boolean follow = false;
@@ -91,6 +93,7 @@ public final class RenderPreview extends SimpleApplication {
                     String[] hm = args[++i].split(":");
                     time = Integer.parseInt(hm[0]) * 3600 + Integer.parseInt(hm[1]) * 60;
                 }
+                case "--date" -> date = java.time.LocalDate.parse(args[++i]);
                 case "--camera" -> preset = CameraRig.Preset.valueOf(args[++i].toUpperCase(java.util.Locale.ROOT));
                 case "--look" -> {
                     String[] p = args[++i].split(",");
@@ -111,7 +114,7 @@ public final class RenderPreview extends SimpleApplication {
                 default -> throw new IllegalArgumentException("Unknown option " + args[i]);
             }
         }
-        return new Options(time, preset, look, follow, quality, warmup, w, h, shot);
+        return new Options(time, date, preset, look, follow, quality, warmup, w, h, shot);
     }
 
     @Override
@@ -125,6 +128,7 @@ public final class RenderPreview extends SimpleApplication {
         }
         renderer = new CrossingRenderer(network, options.quality);
         renderer.setTimeOfDayOverride(OptionalDouble.of(options.time));
+        renderer.setDate(options.date);
         stateManager.attach(renderer);
     }
 
@@ -216,6 +220,15 @@ public final class RenderPreview extends SimpleApplication {
                 throw new UncheckedIOException(e);
             }
             System.out.println("Saved " + file);
+            int[] counts = new int[2];
+            rootNode.depthFirstTraversal(sp -> {
+                if (sp instanceof com.jme3.scene.Geometry g && g.getCullHint() != com.jme3.scene.Spatial.CullHint.Always) {
+                    counts[0]++;
+                    counts[1] += g.getTriangleCount();
+                }
+            });
+            System.out.printf("Scene: %d geometries, %d triangles, %d road users%n", counts[0], counts[1],
+                    renderer.agentCount());
             stop();
         }
 

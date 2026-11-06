@@ -73,6 +73,8 @@ public final class AgentRenderer {
     private final Mesh beamMesh;
     private final Mesh busDisplay = VehicleModels.busDisplay();
     private double lastStepTime = Double.NaN;
+    /** Beyond this distance from the camera small parts are hidden. */
+    private static final float DETAIL_DISTANCE = 150f;
 
     public AgentRenderer(Materials materials) {
         this.materials = materials;
@@ -132,8 +134,9 @@ public final class AgentRenderer {
      * @param alpha    fraction (0-1) of the next simulation step that has elapsed
      * @param tpf      seconds since the previous frame
      * @param lightsOn true when vehicles should drive with their lights on
+     * @param camera   camera position, for hiding small parts of distant road users
      */
-    public void update(SimulationView view, float alpha, float tpf, boolean lightsOn) {
+    public void update(SimulationView view, float alpha, float tpf, boolean lightsOn, Vector3f camera) {
         if (view.time() != lastStepTime) {
             lastStepTime = view.time();
             onSimulationStep(view);
@@ -145,6 +148,9 @@ public final class AgentRenderer {
             float travelled = (float) e.drawn.distance(pose);
             e.drawn = pose;
             e.visual.place(pose);
+            double dx = pose.x() - camera.x;
+            double dy = pose.y() + camera.z;
+            e.visual.setDetailed(dx * dx + dy * dy < DETAIL_DISTANCE * DETAIL_DISTANCE);
             e.visual.animate(e.agent, travelled, clock, lightsOn);
         }
     }

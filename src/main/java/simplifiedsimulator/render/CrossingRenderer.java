@@ -134,7 +134,7 @@ public final class CrossingRenderer extends BaseAppState {
         if (lastView != null) {
             SimulationView view = lastView;
             signals.update(view::signalState, animationClock);
-            agents.update(view, pendingAlpha, tpf, atmosphere.night() > 0.25f);
+            agents.update(view, pendingAlpha, tpf, atmosphere.night() > 0.25f, getApplication().getCamera().getLocation());
         }
     }
 

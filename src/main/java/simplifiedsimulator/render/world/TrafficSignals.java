@@ -201,6 +201,9 @@ public final class TrafficSignals {
         mb.boxBetween(new Vector3f(-0.25f, bottom - (sh - height) / 2, -sw / 2),
                 new Vector3f(-0.23f, bottom + height + (sh - height) / 2, sw / 2));
         mb.color(black);
+        // black back of the screen, seen by traffic from the other direction
+        mb.boxBetween(new Vector3f(-0.26f, bottom - (sh - height) / 2, -sw / 2),
+                new Vector3f(-0.252f, bottom + height + (sh - height) / 2, sw / 2));
         float border = lens * 0.18f;
         mb.boxBetween(new Vector3f(-0.235f, bottom - (sh - height) / 2 + border, -sw / 2 + border),
                 new Vector3f(-0.225f, bottom + height + (sh - height) / 2 - border, sw / 2 - border));

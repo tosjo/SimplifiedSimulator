@@ -27,6 +27,12 @@ public abstract class AgentVisual {
     }
 
     /**
+     * Shows or hides small parts (wheels, limbs, indicators) that cannot be seen from far
+     * away, to save draw calls.
+     */
+    public abstract void setDetailed(boolean detailed);
+
+    /**
      * Updates moving parts and lights.
      *
      * @param agent      the agent's latest state

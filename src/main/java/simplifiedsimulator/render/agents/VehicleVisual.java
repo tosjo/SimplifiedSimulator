@@ -31,6 +31,7 @@ final class VehicleVisual extends AgentVisual {
     private final Geometry beams;
     private final LightMaterials lights;
     private float wheelAngle;
+    private boolean detailed = true;
 
     VehicleVisual(long id, VehicleModels.Model model, Material body, Material wheel, LightMaterials lights,
                   Mesh beamMesh, Material beamMaterial, Geometry extra) {
@@ -73,6 +74,20 @@ final class VehicleVisual extends AgentVisual {
         g.setShadowMode(RenderQueue.ShadowMode.Off);
         node.attachChild(g);
         return g;
+    }
+
+    @Override
+    public void setDetailed(boolean detailed) {
+        if (detailed == this.detailed) {
+            return;
+        }
+        this.detailed = detailed;
+        Spatial.CullHint hint = detailed ? Spatial.CullHint.Inherit : Spatial.CullHint.Always;
+        for (Node w : wheels) {
+            w.setCullHint(hint);
+        }
+        left.setCullHint(hint);
+        right.setCullHint(hint);
     }
 
     @Override

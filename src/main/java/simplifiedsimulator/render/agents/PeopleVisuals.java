@@ -9,6 +9,7 @@ import com.jme3.renderer.queue.RenderQueue;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
+import com.jme3.scene.Spatial;
 import simplifiedsimulator.render.mesh.MeshBuilder;
 import simplifiedsimulator.sim.AgentView;
 
@@ -71,6 +72,15 @@ final class PeopleVisuals {
             pivot.setLocalTranslation(at);
             pivot.attachChild(geometry("limb", mesh, material));
             node.attachChild(pivot);
+        }
+
+        @Override
+        public void setDetailed(boolean detailed) {
+            Spatial.CullHint hint = detailed ? Spatial.CullHint.Inherit : Spatial.CullHint.Always;
+            leftLeg.setCullHint(hint);
+            rightLeg.setCullHint(hint);
+            leftArm.setCullHint(hint);
+            rightArm.setCullHint(hint);
         }
 
         @Override
@@ -168,6 +178,15 @@ final class PeopleVisuals {
                 shins[i].attachChild(geometry("shin", shinMesh, material));
                 node.attachChild(thighs[i]);
                 node.attachChild(shins[i]);
+            }
+        }
+
+        @Override
+        public void setDetailed(boolean detailed) {
+            Spatial.CullHint hint = detailed ? Spatial.CullHint.Inherit : Spatial.CullHint.Always;
+            for (int i = 0; i < 2; i++) {
+                thighs[i].setCullHint(hint);
+                shins[i].setCullHint(hint);
             }
         }
 

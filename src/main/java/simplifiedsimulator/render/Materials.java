@@ -32,6 +32,7 @@ public final class Materials {
         return assets;
     }
 
+
     /**
      * A lit material whose colour comes from the mesh's vertex colours.
      *
@@ -57,8 +58,8 @@ public final class Materials {
             m.setBoolean("UseVertexColor", true);
             m.setColor("Diffuse", paint);
             m.setColor("Ambient", paint);
-            m.setColor("Specular", new ColorRGBA(0.55f, 0.55f, 0.55f, 1f));
-            m.setFloat("Shininess", 48f);
+            m.setColor("Specular", new ColorRGBA(0.7f, 0.7f, 0.7f, 1f));
+            m.setFloat("Shininess", 56f);
             return m;
         });
     }

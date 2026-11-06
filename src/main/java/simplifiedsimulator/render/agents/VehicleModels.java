@@ -54,7 +54,7 @@ public final class VehicleModels {
     }
 
     private static final ColorRGBA PAINT = ColorRGBA.White;
-    private static final ColorRGBA GLASS = new ColorRGBA(0.13f, 0.16f, 0.19f, 1f);
+    private static final ColorRGBA GLASS = new ColorRGBA(0.17f, 0.20f, 0.24f, 1f);
     private static final ColorRGBA TRIM = new ColorRGBA(0.06f, 0.06f, 0.065f, 1f);
     private static final ColorRGBA UNDER = new ColorRGBA(0.03f, 0.03f, 0.03f, 1f);
 
