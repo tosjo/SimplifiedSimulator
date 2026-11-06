@@ -5,6 +5,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Logger;
 import simplifiedsimulator.network.Detector;
@@ -39,6 +42,11 @@ public final class ExternalController implements SignalController {
     private volatile boolean connecting;
     /** The name the controller announced, if any. */
     private volatile String announcedName;
+    /** In lockstep every step waits for the controller's reply to the clock (for testing controllers). */
+    private volatile boolean lockstep;
+    private boolean lockstepStarted;
+    private long lockstepTimeoutMs = 5000;
+    private final BlockingQueue<Double> clockReplies = new LinkedBlockingQueue<>();
 
     public ExternalController(String host, int port) {
         this.host = host;
@@ -57,7 +65,7 @@ public final class ExternalController implements SignalController {
         for (SignalGroup g : context.network().signalGroups()) {
             byNumber.put(g.number(), g);
         }
-        client = new ControllerClient(host, port, incoming::add, name -> announcedName = name);
+        client = new ControllerClient(host, port, incoming::add, name -> announcedName = name, clockReplies::add);
         connect();
     }
 
@@ -78,6 +86,25 @@ public final class ExternalController implements SignalController {
         t.start();
     }
 
+    /**
+     * Switches lockstep on or off. In lockstep each step sends the simulated time after the
+     * sensor messages and waits up to {@code timeoutMs} for the controller to answer, so the
+     * controller's light states take effect in the same step, whatever the simulation speed.
+     * A controller that does not answer in time switches lockstep off again.
+     */
+    public void setLockstep(boolean on, long timeoutMs) {
+        if (timeoutMs <= 0) {
+            throw new IllegalArgumentException("Timeout must be positive, got " + timeoutMs);
+        }
+        lockstep = on;
+        lockstepStarted = false;
+        lockstepTimeoutMs = timeoutMs;
+    }
+
+    public boolean lockstep() {
+        return lockstep;
+    }
+
     public boolean isConnected() {
         return client != null && client.isConnected();
     }
@@ -92,6 +119,57 @@ public final class ExternalController implements SignalController {
 
     @Override
     public void update(double dt) {
+        if (lockstep && isConnected()) {
+            double time = ctx.plan().now();
+            if (!lockstepStarted) {
+                // a first clock before any sensor message, so the controller has switched to the
+                // simulator's time before it hears about any road user
+                lockstepStarted = true;
+                client.send(ProtocolCodec.encodeClock(time));
+                awaitClockReply(time);
+            }
+            if (lockstep) {
+                sendSensors();
+                client.send(ProtocolCodec.encodeClock(time));
+                awaitClockReply(time);
+            }
+        }
+        applyLightUpdates();
+        if (!lockstep && isConnected()) {
+            sendSensors();
+        }
+    }
+
+    private void awaitClockReply(double time) {
+        long deadline = System.nanoTime() + lockstepTimeoutMs * 1_000_000;
+        try {
+            while (true) {
+                long left = deadline - System.nanoTime();
+                Double reply = left > 0 ? clockReplies.poll(left, TimeUnit.NANOSECONDS) : null;
+                if (reply == null) {
+                    LOG.warning(() -> "Controller did not answer the clock within " + lockstepTimeoutMs
+                            + " ms; lockstep switched off");
+                    lockstep = false;
+                    return;
+                }
+                if (Math.abs(reply - time) < 1e-6) {
+                    return;  // older replies are skipped
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void sendSensors() {
+        for (Detector d : ctx.detectors().all()) {
+            if (ctx.detectors().justOccupied(d)) {
+                client.send(ProtocolCodec.encodeSensor(d.group().number()));
+            }
+        }
+    }
+
+    private void applyLightUpdates() {
         LightUpdate update;
         while ((update = incoming.poll()) != null) {
             SignalGroup group = byNumber.get(update.lightId());
@@ -103,13 +181,6 @@ public final class ExternalController implements SignalController {
                 continue;
             }
             ctx.plan().set(group, toSignalState(update.state()));
-        }
-        if (isConnected()) {
-            for (Detector d : ctx.detectors().all()) {
-                if (ctx.detectors().justOccupied(d)) {
-                    client.send(ProtocolCodec.encodeSensor(d.group().number()));
-                }
-            }
         }
     }
 

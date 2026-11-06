@@ -24,8 +24,9 @@ Only the Python standard library is used (Python 3.8 or newer).
 import sys
 
 from shared import (AMBER_STATE, GREEN, INTERGREEN, PEDESTRIANS, RED, STATE_NAMES,  # noqa: F401 - re-exported
-                    Framer, argument_parser, check_plan, encode_light, encode_name, format_groups, log,
-                    open_server, parse_sensor, run_server, serve_session, validate)
+                    Framer, argument_parser, check_plan, encode_clockdone, encode_light, encode_name,
+                    format_groups, log, open_server, parse_clock, parse_sensor, run_server, serve_session,
+                    validate)
 
 # --------------------------------------------------------------------------------------
 # Settings
@@ -164,7 +165,7 @@ class Controller:
 
 def serve(conn, clock, fixed, verbose, tick=0.05):
     """Runs one session with a connected simulator until it disconnects."""
-    serve_session(conn, clock, Controller(clock(), fixed=fixed), verbose, tick)
+    serve_session(conn, clock, lambda now: Controller(now, fixed=fixed), verbose, tick)
 
 
 def main(argv=None):

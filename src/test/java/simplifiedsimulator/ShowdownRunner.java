@@ -4,19 +4,21 @@ import java.io.IOException;
 import java.util.Locale;
 import simplifiedsimulator.control.ExternalController;
 import simplifiedsimulator.sim.Simulation;
+import simplifiedsimulator.stats.MovementStats;
 import simplifiedsimulator.stats.Summary;
 
 /**
  * Measures one controller without a window, for comparing and tuning controllers.
  *
- * <p>Built-in controllers run as fast as possible. An external controller runs on wall-clock
- * time, so the simulation is paced at {@code --speed} times real time; start the controller
- * with the same {@code --speed}. Takes the simulator's usual options, for example
- * {@code ./gradlew showdown --args="--controller external --port 1338 --speed 16 --start 07:00 --duration 3600"}.
+ * <p>Runs as fast as possible. An external controller runs in lockstep: every step waits for
+ * its answer, so the result does not depend on timing or network delays. Takes the
+ * simulator's usual options, for example
+ * {@code ./gradlew showdown --args="--controller external --port 1338 --start 07:00 --duration 3600"}.
  */
 public final class ShowdownRunner {
 
     private static final long CONNECT_TIMEOUT_MS = 10_000;
+    private static final long LOCKSTEP_TIMEOUT_MS = 10_000;
 
     private ShowdownRunner() {
     }
@@ -31,9 +33,12 @@ public final class ShowdownRunner {
         long started = System.nanoTime();
         if (sim.controller() instanceof ExternalController external) {
             waitForConnection(external, config);
-            pace(sim, config.duration(), config.speed());
-        } else {
-            sim.run(config.duration());
+            external.setLockstep(true, LOCKSTEP_TIMEOUT_MS);
+        }
+        sim.run(config.duration());
+        if (sim.controller() instanceof ExternalController external && !external.lockstep()) {
+            System.err.println("The controller stopped answering; the result is not valid");
+            System.exit(1);
         }
         report(sim, config, (System.nanoTime() - started) / 1e9);
         sim.controller().close();
@@ -52,21 +57,6 @@ public final class ShowdownRunner {
         }
     }
 
-    /** Advances the simulation at {@code speed} times real time until {@code seconds} have passed. */
-    private static void pace(Simulation sim, double seconds, double speed) throws InterruptedException {
-        double dt = sim.options().timeStep();
-        long start = System.nanoTime();
-        // stop half a step early: floating point steps may never reach the end exactly
-        while (sim.time() < seconds - dt / 2) {
-            double target = Math.min(seconds, (System.nanoTime() - start) / 1e9 * speed);
-            if (target - sim.time() >= dt) {
-                sim.run(target - sim.time());
-            } else {
-                Thread.sleep(1);
-            }
-        }
-    }
-
     private static void report(Simulation sim, SimulatorConfig config, double wallSeconds) {
         Summary s = sim.summary();
         System.out.printf(Locale.ROOT, "%s: %.0f s simulated in %.0f s%n", sim.controller().name(), sim.time(),
@@ -81,5 +71,9 @@ public final class ShowdownRunner {
         System.out.printf(Locale.ROOT, "RESULT,%s,%d,%.1f,%.2f,%.1f,%.1f,%.1f,%d,%d,%d,%d,%d%n", config.controller(),
                 s.motorCompleted(), s.motorDelay(), s.motorStops(), s.busDelay(), s.bikeDelay(), s.footDelay(),
                 s.maxQueue(), s.entryQueue(), s.redLightRuns(), s.signalConflicts(), s.conflictViolations());
+        for (MovementStats m : sim.statistics().movements(sim.time())) {
+            System.out.printf(Locale.ROOT, "MOVEMENT,%s,%d,%.1f,%.2f,%d%n", m.key(), m.completed(), m.meanDelay(),
+                    m.meanStops(), m.queue());
+        }
     }
 }

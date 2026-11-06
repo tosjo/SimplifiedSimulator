@@ -47,8 +47,8 @@ tasks.test {
     useJUnitPlatform()
 }
 
-// Measures one controller without a window; external controllers run paced at --speed, for example:
-//   ./gradlew showdown --args="--controller external --port 1338 --speed 16 --start 07:00 --duration 3600"
+// Measures one controller without a window; external controllers run in lockstep, for example:
+//   ./gradlew showdown --args="--controller external --port 1338 --start 07:00 --duration 3600"
 tasks.register<JavaExec>("showdown") {
     group = "verification"
     description = "Measures one signal controller (also an external one) without graphics."

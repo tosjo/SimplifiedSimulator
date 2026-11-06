@@ -62,6 +62,16 @@ FAIR_WAIT = 90.0      # buses stop jumping the queue once anyone has waited this
 
 REST_IN_GREEN = True  # a green is not ended while nobody conflicting is waiting
 
+# Variable minimum green: the protocol only reports road users arriving on a detector, so a
+# queue standing still over the upstream loop looks like a gap. Instead, every report while
+# the light is not green counts as a car waiting, and the green lasts at least long enough
+# to clear that queue: STARTUP + HEADWAY s per car per lane (never above the maximum green).
+VARIABLE_MIN = True
+STARTUP = 2.0
+HEADWAY = 2.0
+LANES = {2: 2, 8: 2}
+QUEUING = {"main", "side", "turn", "bus"}
+
 MIN_GREEN = {g: MIN_BY_KIND[k] for g, k in KIND.items()}
 MAX_GREEN = {g: MAX_BY_KIND[k] for g, k in KIND.items()}
 GAP = {g: GAP_BY_KIND[k] for g, k in KIND.items()}
@@ -82,6 +92,8 @@ class SmartController:
         self.last_report = {g: float("-inf") for g in intergreen}
         self.requests = set()
         self.requested_at = {}
+        self.waiting_reports = {}
+        self.min_this_green = {}
         self.served = set()
         self.alternative = set()
         self.current = -1
@@ -97,6 +109,7 @@ class SmartController:
         if self.state[group] != GREEN:
             self.requests.add(group)
             self.requested_at.setdefault(group, now)
+            self.waiting_reports[group] = self.waiting_reports.get(group, 0) + 1
 
     def tick(self, now):
         changes = []
@@ -166,7 +179,7 @@ class SmartController:
 
     def _keep_green(self, g, bus_waiting, now):
         on = now - self.green_started[g]
-        if on < MIN_GREEN[g] - 1e-9:
+        if on < self.min_this_green.get(g, MIN_GREEN[g]) - 1e-9:
             return True
         longest = min(MAX_GREEN[g], ALT_MAX) if g in self.alternative else MAX_GREEN[g]
         if g in BUSES and now - self.last_report[g] < BUS_APPROACH:
@@ -228,6 +241,12 @@ class SmartController:
     def _start_green(self, group, now, changes):
         self.requests.discard(group)
         self.requested_at.pop(group, None)
+        waiting = self.waiting_reports.pop(group, 0)
+        shortest = MIN_GREEN[group]
+        if VARIABLE_MIN and KIND[group] in QUEUING:
+            needed = STARTUP + HEADWAY * waiting / LANES.get(group, 1)
+            shortest = max(shortest, min(needed, MAX_GREEN[group]))
+        self.min_this_green[group] = shortest
         self.green_started[group] = now
         self._set(group, GREEN, changes)
 

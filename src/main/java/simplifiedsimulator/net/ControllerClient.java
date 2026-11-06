@@ -11,7 +11,9 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.function.Consumer;
+import java.util.function.DoubleConsumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -32,6 +34,7 @@ public final class ControllerClient implements AutoCloseable {
     private final int port;
     private final Consumer<LightUpdate> listener;
     private final Consumer<String> nameListener;
+    private final DoubleConsumer clockListener;
 
     private Socket socket;
     private Writer out;
@@ -45,10 +48,19 @@ public final class ControllerClient implements AutoCloseable {
      * @param nameListener gets the name the controller announces, on the reading thread
      */
     public ControllerClient(String host, int port, Consumer<LightUpdate> listener, Consumer<String> nameListener) {
+        this(host, port, listener, nameListener, time -> { });
+    }
+
+    /**
+     * @param clockListener gets the controller's lockstep replies (the simulated time it answers)
+     */
+    public ControllerClient(String host, int port, Consumer<LightUpdate> listener, Consumer<String> nameListener,
+                            DoubleConsumer clockListener) {
         this.host = Objects.requireNonNull(host, "host");
         this.port = port;
         this.listener = Objects.requireNonNull(listener, "listener");
         this.nameListener = Objects.requireNonNull(nameListener, "nameListener");
+        this.clockListener = Objects.requireNonNull(clockListener, "clockListener");
     }
 
     /**
@@ -62,6 +74,8 @@ public final class ControllerClient implements AutoCloseable {
         }
         try {
             Socket newSocket = new Socket();
+            // the messages are tiny and time-critical: send them at once instead of batching
+            newSocket.setTcpNoDelay(true);
             newSocket.connect(new InetSocketAddress(host, port), CONNECT_TIMEOUT_MS);
             socket = newSocket;
             out = new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8);
@@ -134,15 +148,23 @@ public final class ControllerClient implements AutoCloseable {
         if (message.isBlank()) {
             return;
         }
-        Optional<LightUpdate> light = ProtocolCodec.decodeLight(message);
-        Optional<String> name = light.isPresent() ? Optional.empty() : ProtocolCodec.decodeName(message);
-        if (light.isEmpty() && name.isEmpty()) {
-            LOG.warning(() -> "Ignoring unrecognised message: " + message);
-            return;
-        }
         try {
-            light.ifPresent(listener);
-            name.ifPresent(nameListener);
+            Optional<LightUpdate> light = ProtocolCodec.decodeLight(message);
+            if (light.isPresent()) {
+                listener.accept(light.get());
+                return;
+            }
+            OptionalDouble clock = ProtocolCodec.decodeClockDone(message);
+            if (clock.isPresent()) {
+                clockListener.accept(clock.getAsDouble());
+                return;
+            }
+            Optional<String> name = ProtocolCodec.decodeName(message);
+            if (name.isPresent()) {
+                nameListener.accept(name.get());
+                return;
+            }
+            LOG.warning(() -> "Ignoring unrecognised message: " + message);
         } catch (RuntimeException e) {
             LOG.log(Level.WARNING, "Error while handling " + message, e);
         }

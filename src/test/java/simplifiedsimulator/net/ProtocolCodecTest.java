@@ -65,4 +65,19 @@ class ProtocolCodecTest {
             assertTrue(ProtocolCodec.decodeName(bad).isEmpty(), bad);
         }
     }
+
+    @Test
+    void encodesTheClockForLockstep() {
+        assertEquals("{\"clock\":{\"time\":12.3}}", ProtocolCodec.encodeClock(12.3));
+    }
+
+    @Test
+    void decodesTheControllersClockReply() {
+        assertEquals(java.util.OptionalDouble.of(12.3), ProtocolCodec.decodeClockDone("{\"clockdone\":{\"time\":12.3}}"));
+        assertEquals(java.util.OptionalDouble.of(4.0), ProtocolCodec.decodeClockDone("{\"ClockDone\":{\"Time\":4}}"));
+        for (String bad : new String[] {"{\"clockdone\":{}}", "{\"clockdone\":{\"time\":\"x\"}}", "not json",
+                "{\"lightstate\":{\"id\":2,\"state\":2}}"}) {
+            assertTrue(ProtocolCodec.decodeClockDone(bad).isEmpty(), bad);
+        }
+    }
 }

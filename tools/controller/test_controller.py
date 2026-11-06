@@ -183,6 +183,16 @@ class ProtocolTest(unittest.TestCase):
             with self.subTest(bad=bad):
                 self.assertIsNone(c.parse_sensor(bad))
 
+    def test_parses_the_lockstep_clock(self):
+        self.assertEqual(12.3, c.parse_clock('{"clock":{"time":12.3}}'))
+        for bad in ['{"clock":{}}', '{"clock":{"time":"x"}}', '{"sensorstate":{"id":2}}', "nope",
+                    '{"clock":{"time":true}}']:
+            with self.subTest(bad=bad):
+                self.assertIsNone(c.parse_clock(bad))
+
+    def test_encodes_the_clock_reply(self):
+        self.assertEqual({"clockdone": {"time": 12.3}}, json.loads(c.encode_clockdone(12.3)[:-1]))
+
     def test_encodes_a_name_message_with_terminator(self):
         raw = c.encode_name("Smart")
         self.assertTrue(raw.endswith(b"\0"))
@@ -226,6 +236,38 @@ class ServerTest(unittest.TestCase):
                 session.join(5)
                 ctrl_side.close()
         self.assertFalse(session.is_alive(), "the session should end when the simulator disconnects")
+
+    def test_lockstep_session_runs_on_simulated_time_and_answers_every_clock(self):
+        sim, ctrl_side = socket.socketpair()
+        wall_clock = time.monotonic  # real time barely moves while 15 simulated seconds pass
+        with contextlib.redirect_stdout(io.StringIO()):
+            session = threading.Thread(target=c.serve, args=(ctrl_side, wall_clock, False, False))
+            session.start()
+            try:
+                sim.settimeout(5)
+                framer = c.Framer()
+                received = []
+
+                def step(t, sensors=()):
+                    sim.sendall(b"".join(b'{"sensorstate":{"id":%d}}\0' % g for g in sensors)
+                                + b'{"clock":{"time":%.1f}}\0' % t)
+                    while not received or received[-1] != {"clockdone": {"time": round(t, 1)}}:
+                        received.extend(json.loads(m) for m in framer.feed(sim.recv(4096)))
+
+                step(0.0)  # like the simulator: a first clock on its own starts lockstep
+                step(0.0, sensors=[2])
+                for i in range(1, 151):
+                    step(i / 10)
+                greens = [i for i, m in enumerate(received) if m == {"lightstate": {"id": 2, "state": 2}}]
+                self.assertEqual(1, len(greens))
+                answered = [m["clockdone"]["time"] for m in received[:greens[0]] if "clockdone" in m]
+                # green after the longest clearance into 02 (8.9 s), counted in simulated time
+                self.assertAlmostEqual(max(c.INTERGREEN[o][2] for o in c.INTERGREEN[2]), answered[-1] + 0.1,
+                                       delta=0.11)
+            finally:
+                sim.close()
+                session.join(5)
+                ctrl_side.close()
 
     def test_reports_a_port_that_is_in_use(self):
         blocker = c.open_server("localhost", 0)

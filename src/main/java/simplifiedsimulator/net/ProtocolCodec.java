@@ -7,6 +7,7 @@ import com.google.gson.JsonParser;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
 
 /**
  * Encodes and decodes the JSON messages exchanged with the traffic light controller.
@@ -18,6 +19,10 @@ import java.util.Optional;
  *       {@code {"lightstate":{"id":5,"state":2}}} (0 = red, 1 = orange, 2 = green)</li>
  *   <li>Controller to simulator, optional, to say who it is:
  *       {@code {"controllername":{"name":"Smart"}}} (shown on screen)</li>
+ *   <li>Lockstep, only when switched on (for testing controllers): after the sensor messages
+ *       of a step the simulator sends {@code {"clock":{"time":12.3}}} and waits until the
+ *       controller has sent its light states followed by {@code {"clockdone":{"time":12.3}}}.
+ *       The first lockstep step starts with an extra clock message before any sensor message.</li>
  * </ul>
  *
  * On the wire every message is terminated by a NUL character, see {@link ControllerClient}.
@@ -53,6 +58,29 @@ public final class ProtocolCodec {
             return Optional.of(new LightUpdate(parsed.lightstate.id, LightState.fromCode(parsed.lightstate.state)));
         } catch (JsonParseException | IllegalArgumentException e) {
             return Optional.empty();
+        }
+    }
+
+    /** Builds the lockstep clock message for simulated time {@code time}. */
+    public static String encodeClock(double time) {
+        return GSON.toJson(new ClockMessage(new TimeHolder(time)));
+    }
+
+    /**
+     * Decodes the controller's lockstep reply.
+     *
+     * @return the simulated time it answers, or empty if the message is not a clock reply
+     */
+    public static OptionalDouble decodeClockDone(String message) {
+        try {
+            JsonElement holder = member(JsonParser.parseString(message), "clockdone");
+            JsonElement time = holder == null ? null : member(holder, "time");
+            if (time == null || !time.isJsonPrimitive() || !time.getAsJsonPrimitive().isNumber()) {
+                return OptionalDouble.empty();
+            }
+            return OptionalDouble.of(time.getAsDouble());
+        } catch (JsonParseException | NumberFormatException e) {
+            return OptionalDouble.empty();
         }
     }
 
@@ -97,6 +125,12 @@ public final class ProtocolCodec {
     }
 
     private record SensorMessage(IdHolder sensorstate) {
+    }
+
+    private record TimeHolder(double time) {
+    }
+
+    private record ClockMessage(TimeHolder clock) {
     }
 
     private static final class LightMessage {

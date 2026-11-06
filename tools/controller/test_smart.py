@@ -72,6 +72,19 @@ class SmartControllerTest(unittest.TestCase):
         self.assertLess(ended, 25.0 + s.GAP[2] + 2 * DT, "ended one gap after the last car")
         self.assertIsNotNone(first(changes, 5, GREEN))
 
+    def test_a_queue_counted_at_red_gets_enough_green_to_clear(self):
+        # twenty reports for the two-lane 02 while it waits; then nobody reports during the green
+        arrivals = [(0.1 * i, 2) for i in range(20)] + [(5.0, 5)]
+        changes = run(s.SmartController(0.0), 0.0, 80.0, arrivals)
+        green, ended = first(changes, 2, GREEN), first(changes, 2, AMBER_STATE)
+        expected = s.STARTUP + s.HEADWAY * 20 / s.LANES.get(2, 1)
+        self.assertGreaterEqual(ended - green, min(expected, s.MAX_GREEN[2]) - 2 * DT)
+
+    def test_variable_minimum_never_exceeds_the_maximum(self):
+        arrivals = [(0.01 * i, 3) for i in range(200)] + [(5.0, 5)]
+        changes = run(s.SmartController(0.0), 0.0, 120.0, arrivals)
+        self.assertLessEqual(first(changes, 3, AMBER_STATE) - first(changes, 3, GREEN), s.MAX_GREEN[3] + 2 * DT)
+
     def test_endless_traffic_still_yields_at_the_maximum_green(self):
         changes = run(s.SmartController(0.0), 0.0, 200.0, steady(2, 0.0, 200.0, 0.5) + [(20.0, 5)])
         green, ended = first(changes, 2, GREEN), first(changes, 2, AMBER_STATE)

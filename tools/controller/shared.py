@@ -115,6 +115,22 @@ def encode_name(name):
     return json.dumps({"controllername": {"name": name}}).encode("utf-8") + b"\0"
 
 
+def parse_clock(message):
+    """Returns the simulated time of a lockstep {"clock":{"time":T}} message, or None."""
+    try:
+        value = json.loads(message)["clock"]["time"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def encode_clockdone(time_):
+    """Tells the simulator in lockstep that every light change for time_ has been sent."""
+    return json.dumps({"clockdone": {"time": time_}}).encode("utf-8") + b"\0"
+
+
 # --------------------------------------------------------------------------------------
 # Server: the simulator connects to us
 # --------------------------------------------------------------------------------------
@@ -134,12 +150,29 @@ def open_server(host, port):
     return server
 
 
-def serve_session(conn, clock, controller, verbose, tick=0.05):
-    """Runs one session with a connected simulator until it disconnects."""
+def serve_session(conn, clock, make_controller, verbose, tick=0.05):
+    """Runs one session with a connected simulator until it disconnects.
+
+    `make_controller(now)` builds the controller. Normally it runs on `clock`. When the
+    simulator sends lockstep clock messages (its test mode), the controller is built afresh
+    on the simulator's own time at the first one, so test runs repeat exactly, and it answers
+    every clock message once its light changes for that moment are sent.
+    """
+    try:
+        conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # tiny, time-critical messages
+    except OSError:
+        pass  # not a TCP socket (tests use a socket pair)
     conn.settimeout(tick)
     framer = Framer()
+    controller = make_controller(clock())
     conn.sendall(encode_name(controller.NAME)
                  + b"".join(encode_light(g, s) for g, s in controller.startup_messages()))
+    lockstep = False
+    sim_time = 0.0
+
+    def now():
+        return sim_time if lockstep else clock()
+
     while True:
         try:
             data = conn.recv(4096)
@@ -147,19 +180,36 @@ def serve_session(conn, clock, controller, verbose, tick=0.05):
                 return
         except socket.timeout:
             data = b""
+        out = []
         for message in framer.feed(data):
+            moment = parse_clock(message)
+            if moment is not None:
+                if not lockstep:
+                    # all lights are still red, as for a new controller: start one on exact time
+                    lockstep = True
+                    controller = make_controller(moment)
+                sim_time = moment
+                out.append(_encode_changes(controller, controller.tick(now()), verbose))
+                out.append(encode_clockdone(moment))
+                continue
             group = parse_sensor(message)
             if group is None:
                 log("ignoring unexpected message: %.80s" % message)
                 continue
-            controller.detector(group, clock())
-        changes = controller.tick(clock())
-        if changes:
-            conn.sendall(b"".join(encode_light(g, s) for g, s in changes))
-            if verbose:
-                log(", ".join("%02d %s" % (g, STATE_NAMES[s]) for g, s in changes))
-            elif any(s == GREEN for g, s in changes):
-                log(controller.describe())
+            controller.detector(group, now())
+        if not lockstep:
+            out.append(_encode_changes(controller, controller.tick(now()), verbose))
+        if any(out):
+            conn.sendall(b"".join(out))
+
+
+def _encode_changes(controller, changes, verbose):
+    if changes:
+        if verbose:
+            log(", ".join("%02d %s" % (g, STATE_NAMES[s]) for g, s in changes))
+        elif any(s == GREEN for g, s in changes):
+            log(controller.describe())
+    return b"".join(encode_light(g, s) for g, s in changes)
 
 
 def argument_parser(description, default_port):
@@ -209,7 +259,7 @@ def run_server(args, make_controller, mode, simulator_hint):
                 log("Simulator connected from %s:%d" % address)
                 with conn:
                     try:
-                        serve_session(conn, clock, make_controller(clock()), args.verbose, args.tick)
+                        serve_session(conn, clock, make_controller, args.verbose, args.tick)
                     except OSError:
                         pass  # the simulator went away mid-message; same as a normal disconnect
                 log("Simulator disconnected. Waiting for it to connect again (press R in the simulator).")
