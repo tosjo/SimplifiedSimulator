@@ -128,8 +128,8 @@ public final class Main {
         Summary s = simulation.summary();
         out.printf(Locale.ROOT, "%nMotor vehicles: %d, average delay %.1f s, %.2f stops%n", s.motorCompleted(),
                 s.motorDelay(), s.motorStops());
-        out.printf(Locale.ROOT, "Average delay: buses %.1f s, cyclists %.1f s, pedestrians %.1f s%n", s.busDelay(),
-                s.bikeDelay(), s.footDelay());
+        out.printf(Locale.ROOT, "Average delay: buses %s, cyclists %s, pedestrians %s%n", seconds(s.busDelay()),
+                seconds(s.bikeDelay()), seconds(s.footDelay()));
         out.printf(Locale.ROOT, "Safety: %d red-light runs, %d conflicting greens, %d overlaps%n", s.redLightRuns(),
                 s.signalConflicts(), s.conflictViolations());
         if (config.csv() != null) {
@@ -147,5 +147,10 @@ public final class Main {
             // closing an external connection is best effort
         }
         return s.signalConflicts() == 0 && s.conflictViolations() == 0;
+    }
+
+    /** Formats an average in seconds, or "-" when nobody has finished a trip yet. */
+    private static String seconds(double value) {
+        return Double.isNaN(value) ? "-" : String.format(Locale.ROOT, "%.1f s", value);
     }
 }
