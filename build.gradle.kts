@@ -15,6 +15,7 @@ dependencies {
     implementation("org.jmonkeyengine:jme3-core:$jmeVersion")
     implementation("org.jmonkeyengine:jme3-desktop:$jmeVersion")
     implementation("org.jmonkeyengine:jme3-lwjgl3:$jmeVersion")
+    implementation("org.jmonkeyengine:jme3-effects:$jmeVersion")
     implementation("com.google.code.gson:gson:2.13.2")
 
     testImplementation(platform("org.junit:junit-bom:5.14.4"))
