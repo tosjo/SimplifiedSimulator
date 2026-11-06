@@ -47,6 +47,15 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// Measures one controller without a window; external controllers run paced at --speed, for example:
+//   ./gradlew showdown --args="--controller external --port 1338 --speed 16 --start 07:00 --duration 3600"
+tasks.register<JavaExec>("showdown") {
+    group = "verification"
+    description = "Measures one signal controller (also an external one) without graphics."
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("simplifiedsimulator.ShowdownRunner")
+}
+
 // Headless comparison of signal controllers, for example:
 //   ./gradlew batch --args="--controllers fixed,actuated --seeds 3 --duration 3600"
 tasks.register<JavaExec>("batch") {
