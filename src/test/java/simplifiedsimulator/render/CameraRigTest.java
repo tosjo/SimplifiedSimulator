@@ -3,6 +3,7 @@ package simplifiedsimulator.render;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.jme3.renderer.Camera;
 import org.junit.jupiter.api.Test;
 
 class CameraRigTest {
@@ -33,6 +34,15 @@ class CameraRigTest {
     @Test
     void aFastFlickInNeverGivesAZeroOrNegativeDistance() {
         assertTrue(CameraRig.zoomedDistance(170f, -10 * NOTCH) > 0);
+    }
+
+    @Test
+    void aspectUsesTheViewPortWidth() {
+        Camera full = new Camera(1600, 900);
+        assertEquals(1600f / 900f, CameraRig.aspect(full), 1e-6);
+        Camera leftHalf = new Camera(1600, 900);
+        leftHalf.setViewPort(0, 0.5f, 0, 1);
+        assertEquals(800f / 900f, CameraRig.aspect(leftHalf), 1e-6);
     }
 
     @Test

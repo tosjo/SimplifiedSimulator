@@ -32,11 +32,6 @@ import simplifiedsimulator.ui.ScreenshotCapture;
 public final class SimplifiedSimulator extends SimpleApplication implements ActionListener {
 
     private static final Logger LOG = Logger.getLogger(SimplifiedSimulator.class.getName());
-    private static final double MIN_SPEED = 0.25;
-    private static final double MAX_SPEED = 64;
-    /** Upper limit of simulation work per frame, so the window stays responsive at high speeds. */
-    private static final double MAX_STEPS_PER_FRAME = 400;
-
     private static final String PAUSE = "Sim.Pause";
     private static final String FASTER = "Sim.Faster";
     private static final String SLOWER = "Sim.Slower";
@@ -54,9 +49,7 @@ public final class SimplifiedSimulator extends SimpleApplication implements Acti
     private CrossingRenderer renderer;
     private HudState hud;
     private String controllerName;
-    private double speed;
-    private boolean paused;
-    private double accumulator;
+    private final StepClock clock;
     private int frames;
     private float fpsTime;
     private int fpsFrames;
@@ -66,7 +59,7 @@ public final class SimplifiedSimulator extends SimpleApplication implements Acti
         super();
         this.config = config;
         this.simulation = simulation;
-        this.speed = config.speed();
+        this.clock = new StepClock(simulation.options().timeStep(), config.speed());
         this.controllerName = config.controller();
     }
 
@@ -88,12 +81,12 @@ public final class SimplifiedSimulator extends SimpleApplication implements Acti
         boolean screenshot = config.screenshot() != null;
         // a screenshot shows the moment as if the simulation were running normally
         hud = new HudState(() -> simulation, renderer,
-                () -> screenshot ? new AppStatus(speed, false, -1) : new AppStatus(speed, paused, fps));
+                () -> screenshot ? new AppStatus(clock.speed(), false, -1) : new AppStatus(clock.speed(), clock.paused(), fps));
         stateManager.attach(hud);
 
         if (screenshot) {
             // render a frozen moment: the simulation has already run for --duration seconds
-            paused = true;
+            clock.setPaused(true);
             guiViewPort.addProcessor(new ScreenshotCapture(config.screenshot(), 10, this::screenshotSaved));
         } else {
             ScreenshotAppState screenshots = new ScreenshotAppState("", "simplified-simulator");
@@ -131,11 +124,11 @@ public final class SimplifiedSimulator extends SimpleApplication implements Acti
         }
         switch (name) {
             case PAUSE -> {
-                paused = !paused;
-                hud.flash(paused ? "Paused" : "Running");
+                clock.togglePause();
+                hud.flash(clock.paused() ? "Paused" : "Running");
             }
-            case FASTER -> setSpeed(speed * 2);
-            case SLOWER -> setSpeed(speed / 2);
+            case FASTER -> setSpeed(clock.speed() * 2);
+            case SLOWER -> setSpeed(clock.speed() / 2);
             case CONTROLLER -> nextController();
             case RECONNECT -> reconnect();
             case MORE -> setDemandScale(simulation.demandScale() + 0.1);
@@ -151,7 +144,8 @@ public final class SimplifiedSimulator extends SimpleApplication implements Acti
     }
 
     private void setSpeed(double value) {
-        speed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, value));
+        clock.setSpeed(value);
+        double speed = clock.speed();
         hud.flash(String.format(Locale.ROOT, "Speed %s", speed >= 1 ? (long) speed + "x" : "1/" + (long) (1 / speed) + "x"));
     }
 
@@ -198,16 +192,11 @@ public final class SimplifiedSimulator extends SimpleApplication implements Acti
         }
         countFps(tpf);
 
-        double dt = simulation.options().timeStep();
-        if (!paused) {
-            accumulator += tpf * speed;
-            accumulator = Math.min(accumulator, MAX_STEPS_PER_FRAME * dt);
-            while (accumulator >= dt) {
-                simulation.step();
-                accumulator -= dt;
-            }
+        int steps = clock.advance(tpf);
+        for (int i = 0; i < steps; i++) {
+            simulation.step();
         }
-        renderer.update(simulation, (float) (accumulator / dt));
+        renderer.update(simulation, clock.alpha());
         if (config.duration() > 0 && config.screenshot() == null && simulation.time() >= config.duration()) {
             stop();
         }

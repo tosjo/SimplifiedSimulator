@@ -37,13 +37,16 @@ import simplifiedsimulator.sim.SimulationView;
  *
  * The renderer builds the static world (ground, buildings, trees, street lights, traffic
  * lights) when attached, adds the post-processing filters to the main view port and
- * installs a {@link CameraRig} (it replaces the default fly camera). Lighting follows
+ * installs a {@link CameraRig} (it replaces the default fly camera). A {@link RenderTarget}
+ * draws into another view port instead, for example the right half of a duel. Lighting follows
  * {@link SimulationView#timeOfDay()} unless {@link #setTimeOfDayOverride} is used.
  */
 public final class CrossingRenderer extends BaseAppState {
 
     private final Network network;
     private final RenderQuality quality;
+    private final RenderTarget requestedTarget;
+    private RenderTarget target;
     private final Node scene = new Node("crossing");
     private LocalDate date = LocalDate.now();
     private OptionalDouble timeOverride = OptionalDouble.empty();
@@ -60,13 +63,23 @@ public final class CrossingRenderer extends BaseAppState {
     private double animationClock;
 
     public CrossingRenderer(Network network, RenderQuality quality) {
+        this(network, quality, null);
+    }
+
+    /**
+     * @param target where to draw, or {@code null} for the main view port with a camera rig
+     */
+    public CrossingRenderer(Network network, RenderQuality quality, RenderTarget target) {
         this.network = Objects.requireNonNull(network);
         this.quality = Objects.requireNonNull(quality);
+        this.requestedTarget = target;
     }
 
     @Override
     protected void initialize(Application app) {
         SimpleApplication simple = (SimpleApplication) app;
+        target = requestedTarget != null ? requestedTarget
+                : new RenderTarget(simple.getRootNode(), app.getViewPort(), true);
         materials = new Materials(app.getAssetManager());
         environment = new Environment(materials);
         scene.attachChild(environment.node());
@@ -86,19 +99,23 @@ public final class CrossingRenderer extends BaseAppState {
         scene.addLight(environment.sunLight());
         scene.addLight(environment.ambientLight());
 
-        simple.getRootNode().attachChild(scene);
+        target.parent().attachChild(scene);
         int samples = app.getContext().getSettings().getSamples();
-        filters = environment.createFilters(app.getViewPort(), quality, samples);
+        filters = environment.createFilters(target.viewPort(), quality, samples);
 
-        cameraRig = new CameraRig(agents::pose, agents::length, this::pick);
-        app.getStateManager().attach(cameraRig);
+        if (target.cameraRig()) {
+            cameraRig = new CameraRig(agents::pose, agents::length, this::pick);
+            app.getStateManager().attach(cameraRig);
+        }
     }
 
     @Override
     protected void cleanup(Application app) {
         scene.removeFromParent();
-        app.getViewPort().removeProcessor(filters);
-        app.getStateManager().detach(cameraRig);
+        target.viewPort().removeProcessor(filters);
+        if (cameraRig != null) {
+            app.getStateManager().detach(cameraRig);
+        }
     }
 
     @Override
@@ -134,7 +151,8 @@ public final class CrossingRenderer extends BaseAppState {
         if (lastView != null) {
             SimulationView view = lastView;
             signals.update(view::signalState, animationClock);
-            agents.update(view, pendingAlpha, tpf, atmosphere.night() > 0.25f, getApplication().getCamera().getLocation());
+            agents.update(view, pendingAlpha, tpf, atmosphere.night() > 0.25f,
+                    target.viewPort().getCamera().getLocation());
         }
     }
 
@@ -155,6 +173,7 @@ public final class CrossingRenderer extends BaseAppState {
         return quality;
     }
 
+    /** The camera rig, or {@code null} when the {@link RenderTarget} does not install one. */
     public CameraRig cameraRig() {
         return cameraRig;
     }

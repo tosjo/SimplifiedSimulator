@@ -2,6 +2,7 @@ package simplifiedsimulator.ui;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -11,8 +12,42 @@ import simplifiedsimulator.network.Mode;
 import simplifiedsimulator.network.Network;
 import simplifiedsimulator.sim.SignalState;
 import simplifiedsimulator.stats.MovementStats;
+import simplifiedsimulator.stats.Summary;
 
 class HudTextTest {
+
+    @Test
+    void duelTableHighlightsTheBetterSideAndNeverShowsNaN() {
+        DuelScore.Side a = new DuelScore.Side("Vehicle actuated",
+                new Summary(100, 40, 1.2, Double.NaN, 30, 20, 8, 0, 0, 0, 0), 4);
+        DuelScore.Side b = new DuelScore.Side("Fixed time",
+                new Summary(100, 80, 1.6, Double.NaN, 50, 25, 8, 0, 0, 0, 0), 9);
+        String table = HudText.duelTable(a, b);
+        assertTrue(table.startsWith(HudText.GREEN + "Vehicle actuated leads: 50% less vehicle delay"), table);
+        assertTrue(table.contains("Vehicle actuated") && table.contains("Fixed time"));
+        assertTrue(table.contains(HudText.GREEN + String.format("%8s", "40 s")), table);
+        assertTrue(table.contains(HudText.WHITE + String.format("%8s", "80 s")), table);
+        assertFalse(table.contains("NaN"), table);
+    }
+
+    @Test
+    void duelTableShowsWarmingUpInGrey() {
+        Summary none = new Summary(0, Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN, 0, 0, 0, 0, 0);
+        String table = HudText.duelTable(new DuelScore.Side("A", none, 0), new DuelScore.Side("B", none, 0));
+        assertTrue(table.startsWith(HudText.GREY + "warming up"), table);
+        assertFalse(table.contains("NaN"), table);
+    }
+
+    @Test
+    void duelTableOnlyUsesCharactersTheConsoleFontHas() {
+        Summary none = new Summary(0, Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN, 0, 0, 0, 0, 0);
+        Summary some = new Summary(100, 40, 1.2, 30, 30, 20, 8, 0, 0, 0, 0);
+        for (Summary s : new Summary[] {none, some}) {
+            String table = HudText.duelTable(new DuelScore.Side("A", s, 0), new DuelScore.Side("B", none, 0));
+            // Console.fnt has the printable ASCII range only
+            assertTrue(table.chars().allMatch(c -> c == 10 || (c >= 32 && c <= 126)), table);
+        }
+    }
 
     @Test
     void formatsClockAndSpeed() {
