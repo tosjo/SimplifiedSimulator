@@ -20,8 +20,12 @@ final class StepClock {
         if (!(timeStep > 0)) {
             throw new IllegalArgumentException("Time step must be positive, got " + timeStep);
         }
+        if (!(speed > 0) || speed > MAX_SPEED) {
+            throw new IllegalArgumentException("Speed must be more than 0 and at most " + MAX_SPEED + ", got " + speed);
+        }
         this.timeStep = timeStep;
-        setSpeed(speed);
+        // kept as given (--speed allows below MIN_SPEED); only the keys clamp it
+        this.speed = speed;
     }
 
     /** Adds a frame of {@code tpf} seconds and returns how many simulation steps to take now. */

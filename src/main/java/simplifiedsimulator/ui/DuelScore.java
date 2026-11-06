@@ -9,6 +9,8 @@ public final class DuelScore {
 
     /** Differences in vehicle delay below this fraction count as a draw. */
     static final double NECK_AND_NECK = 0.02;
+    /** Finished motor trips each side needs before a leader is named; a handful of cars proves nothing. */
+    static final int MIN_TRIPS = 20;
 
     /**
      * One side of the duel.
@@ -49,9 +51,10 @@ public final class DuelScore {
     public static String headline(Side a, Side b) {
         double da = a.summary().motorDelay();
         double db = b.summary().motorDelay();
-        if (a.summary().motorCompleted() == 0 || b.summary().motorCompleted() == 0 || Double.isNaN(da)
+        if (a.summary().motorCompleted() < MIN_TRIPS || b.summary().motorCompleted() < MIN_TRIPS || Double.isNaN(da)
                 || Double.isNaN(db)) {
-            return "warming up…";
+            // plain dots: the scoreboard's console font has no ellipsis
+            return "warming up...";
         }
         double worst = Math.max(da, db);
         double margin = worst > 0 ? Math.abs(da - db) / worst : 0;

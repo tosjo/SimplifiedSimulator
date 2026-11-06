@@ -72,8 +72,20 @@ class DuelScoreTest {
 
     @Test
     void headlineWaitsUntilBothSidesHaveFinishedTrips() {
-        assertEquals("warming up…",
+        assertEquals("warming up...",
                 DuelScore.headline(side("A", summary(0, Double.NaN), 0), side("B", summary(30, 50), 0)));
+    }
+
+    @Test
+    void headlineWaitsForEnoughTripsToJudge() {
+        // one car through on green against one held at red says nothing about the controllers yet
+        assertEquals("warming up...",
+                DuelScore.headline(side("A", summary(1, 0.5), 0), side("B", summary(1, 30), 0)));
+        assertEquals("warming up...",
+                DuelScore.headline(side("A", summary(DuelScore.MIN_TRIPS - 1, 20), 0),
+                        side("B", summary(100, 40), 0)));
+        assertEquals("A leads: 50% less vehicle delay",
+                DuelScore.headline(side("A", summary(DuelScore.MIN_TRIPS, 20), 0), side("B", summary(100, 40), 0)));
     }
 
     @Test

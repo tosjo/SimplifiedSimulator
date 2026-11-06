@@ -108,7 +108,8 @@ public final class Main {
             throws IOException {
         Network network = Network.loadDefault();
         DemandModel demand = config.demandFile() == null ? DemandModel.loadDefault() : DemandModel.load(config.demandFile());
-        double start = (config.start() - WARM_UP + 86_400) % 86_400;
+        // the warm-up runs before the window opens, so only then does the clock start earlier
+        double start = (config.start() - (warmUp ? WARM_UP : 0) + 86_400) % 86_400;
         SimulationOptions options = SimulationOptions.defaults()
                 .withDemand(demand)
                 .withDemandScale(config.demandScale())

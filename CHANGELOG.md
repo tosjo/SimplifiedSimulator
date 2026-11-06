@@ -16,6 +16,10 @@ All notable changes to this project are documented here. The project follows
 - The camera's aspect ratio follows its view port, and the renderer can draw into any
   view port (needed for the split screen; the single view is unchanged).
 
+### Fixed
+- With an external controller the clock started 3 minutes before `--start`, because the
+  warm-up offset was applied although an external controller gets no warm-up.
+
 ## [1.1.0] - 2026-11-06
 
 ### Added

@@ -39,6 +39,17 @@ class HudTextTest {
     }
 
     @Test
+    void duelTableOnlyUsesCharactersTheConsoleFontHas() {
+        Summary none = new Summary(0, Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN, 0, 0, 0, 0, 0);
+        Summary some = new Summary(100, 40, 1.2, 30, 30, 20, 8, 0, 0, 0, 0);
+        for (Summary s : new Summary[] {none, some}) {
+            String table = HudText.duelTable(new DuelScore.Side("A", s, 0), new DuelScore.Side("B", none, 0));
+            // Console.fnt has the printable ASCII range only
+            assertTrue(table.chars().allMatch(c -> c == 10 || (c >= 32 && c <= 126)), table);
+        }
+    }
+
+    @Test
     void formatsClockAndSpeed() {
         assertEquals("07:30:05", HudText.clock(7.5 * 3600 + 5));
         assertEquals("00:00:10", HudText.clock(86_410));

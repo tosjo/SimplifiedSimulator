@@ -51,6 +51,12 @@ class StepClockTest {
     }
 
     @Test
+    void startingSpeedFromTheCommandLineIsKeptAsGiven() {
+        // --speed allows anything above 0; only the + and - keys stay within the range
+        assertEquals(0.1, new StepClock(DT, 0.1).speed());
+    }
+
+    @Test
     void alphaIsTheFractionOfAStepLeftOver() {
         StepClock clock = new StepClock(DT, 1);
         clock.advance(0.125f);
