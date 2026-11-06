@@ -106,8 +106,5 @@ class MeshBuilderTest {
             }
         }
         assertEquals(Math.PI * 400, covered, 15);
-        r.fill(ColorRGBA.White).fadeBorders(10);
-        assertEquals(0f, r.get(0, 50).a, 1e-6f);
-        assertEquals(1f, r.get(50, 50).a, 1e-6f);
     }
 }

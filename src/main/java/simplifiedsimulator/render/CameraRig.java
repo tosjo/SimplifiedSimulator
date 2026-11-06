@@ -20,6 +20,7 @@ import com.jme3.renderer.Camera;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.Function;
+import java.util.function.ToDoubleFunction;
 import simplifiedsimulator.render.agents.Pose;
 
 /**
@@ -67,6 +68,7 @@ public final class CameraRig extends BaseAppState implements ActionListener, Ana
     private static final float EYE = 1.7f;
 
     private final Function<Long, Optional<Pose>> agentPoses;
+    private final ToDoubleFunction<Long> agentLengths;
     private final Function<Ray, Optional<Long>> picker;
     private Camera cam;
     private InputManager input;
@@ -93,11 +95,14 @@ public final class CameraRig extends BaseAppState implements ActionListener, Ana
     private final boolean[] held = new boolean[KEYS.length];
 
     /**
-     * @param agentPoses where a followed agent is drawn (empty once it has left)
-     * @param picker     finds the agent under a ray from the cursor
+     * @param agentPoses   where a followed agent is drawn (empty once it has left)
+     * @param agentLengths length in metres of an agent, to keep the chase camera at a sensible distance
+     * @param picker       finds the agent under a ray from the cursor
      */
-    public CameraRig(Function<Long, Optional<Pose>> agentPoses, Function<Ray, Optional<Long>> picker) {
+    public CameraRig(Function<Long, Optional<Pose>> agentPoses, ToDoubleFunction<Long> agentLengths,
+                     Function<Ray, Optional<Long>> picker) {
         this.agentPoses = agentPoses;
+        this.agentLengths = agentLengths;
         this.picker = picker;
     }
 
@@ -226,6 +231,7 @@ public final class CameraRig extends BaseAppState implements ActionListener, Ana
             beforeFollow = mode;
         }
         followed = agentId;
+        followLength = (float) agentLengths.applyAsDouble(agentId);
         mode = driverView ? Mode.DRIVER : Mode.FOLLOW;
         chaseInitialised = false;
     }
@@ -239,11 +245,6 @@ public final class CameraRig extends BaseAppState implements ActionListener, Ana
                 applyFly();
             }
         }
-    }
-
-    /** Length of the followed vehicle, so that the chase camera keeps a sensible distance. */
-    public void setFollowedLength(float metres) {
-        followLength = metres;
     }
 
     @Override

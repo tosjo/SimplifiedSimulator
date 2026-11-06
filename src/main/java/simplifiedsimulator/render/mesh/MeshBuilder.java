@@ -38,10 +38,6 @@ public final class MeshBuilder {
         return this;
     }
 
-    public ColorRGBA color() {
-        return color.clone();
-    }
-
     /** Multiplies the current frame with {@code m}; undo with {@link #pop()}. */
     public MeshBuilder push(Matrix4f m) {
         stack.add(transform);
@@ -305,18 +301,6 @@ public final class MeshBuilder {
         ColorRGBA color(Vector3f normal, int section, int edge);
     }
 
-    /** Appends another builder's geometry (already in its final coordinates). */
-    public void append(MeshBuilder other) {
-        int offset = vertexCount();
-        positions.addAll(other.positions);
-        normals.addAll(other.normals);
-        colors.addAll(other.colors);
-        uvs.addAll(other.uvs);
-        for (int i = 0; i < other.indices.size(); i++) {
-            indices.add(other.indices.get(i) + offset);
-        }
-    }
-
     public Mesh build() {
         Mesh mesh = new Mesh();
         mesh.setBuffer(VertexBuffer.Type.Position, 3, BufferUtils.createFloatBuffer(positions.toArray()));
@@ -349,12 +333,6 @@ public final class MeshBuilder {
             size += values.length;
         }
 
-        void addAll(FloatList other) {
-            ensure(size + other.size);
-            System.arraycopy(other.data, 0, data, size, other.size);
-            size += other.size;
-        }
-
         int size() {
             return size;
         }
@@ -381,10 +359,6 @@ public final class MeshBuilder {
             }
             System.arraycopy(values, 0, data, size, values.length);
             size += values.length;
-        }
-
-        int get(int i) {
-            return data[i];
         }
 
         int size() {

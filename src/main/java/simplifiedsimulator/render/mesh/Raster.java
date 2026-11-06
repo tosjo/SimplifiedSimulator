@@ -189,19 +189,6 @@ public final class Raster {
         return this;
     }
 
-    /** Multiplies the alpha channel by a fade towards the borders over {@code border} pixels. */
-    public Raster fadeBorders(int border) {
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                int d = Math.min(Math.min(x, width - 1 - x), Math.min(y, height - 1 - y));
-                if (d < border) {
-                    rgba[index(x, y) + 3] *= smooth((float) d / border);
-                }
-            }
-        }
-        return this;
-    }
-
     public Texture2D toTexture(boolean repeat) {
         ByteBuffer data = BufferUtils.createByteBuffer(width * height * 4);
         // jME images have their origin at the bottom-left

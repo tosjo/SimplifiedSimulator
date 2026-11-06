@@ -90,7 +90,7 @@ public final class CrossingRenderer extends BaseAppState {
         int samples = app.getContext().getSettings().getSamples();
         filters = environment.createFilters(app.getViewPort(), quality, samples);
 
-        cameraRig = new CameraRig(agents::pose, this::pick);
+        cameraRig = new CameraRig(agents::pose, agents::length, this::pick);
         app.getStateManager().attach(cameraRig);
     }
 

@@ -187,6 +187,12 @@ public final class AgentRenderer {
         return e == null ? Optional.empty() : Optional.of(e.drawn);
     }
 
+    /** Length in metres of an agent (4.5 when it is unknown). */
+    public double length(long id) {
+        Entry e = entries.get(id);
+        return e == null ? 4.5 : e.agent.type().length();
+    }
+
     /** The agent hit by a ray (for example from the mouse cursor), if any. */
     public Optional<Long> pick(Ray ray) {
         CollisionResults results = new CollisionResults();
