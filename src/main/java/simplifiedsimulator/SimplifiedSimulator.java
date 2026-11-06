@@ -108,6 +108,9 @@ public final class SimplifiedSimulator extends SimpleApplication implements Acti
         map(HELP, KeyInput.KEY_H, KeyInput.KEY_F1);
         map(TIMELINE, KeyInput.KEY_T);
         map(STATS, KeyInput.KEY_G);
+        for (Preset preset : Preset.values()) {
+            map(preset.mapping(), preset.key());
+        }
     }
 
     private void map(String name, int... keys) {
@@ -137,10 +140,13 @@ public final class SimplifiedSimulator extends SimpleApplication implements Acti
             case HELP -> hud.toggleHelp();
             case TIMELINE -> hud.toggleTimeline();
             case STATS -> hud.toggleStatistics();
-            default -> {
-                // not ours
-            }
+            default -> Preset.forMapping(name).ifPresent(this::applyPreset);
         }
+    }
+
+    private void applyPreset(Preset preset) {
+        preset.apply(simulation);
+        hud.flash(preset.description() + ", statistics restarted");
     }
 
     private void setSpeed(double value) {

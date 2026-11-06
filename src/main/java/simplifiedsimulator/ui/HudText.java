@@ -199,6 +199,9 @@ final class HudText {
               R                 reconnect the external controller
               X                 save statistics   F12                 screenshot
 
+            Situations (clock, traffic and statistics start again)
+              F5  morning rush     F6  evening rush    F7  stress test (200% traffic)
+
             Display
               T  signal timeline   G  statistics   H  this help   Esc  quit""";
 
@@ -213,6 +216,9 @@ final class HudText {
               [ / ]             less / more traffic
               R                 reconnect the external controllers
               X                 save statistics   F12                 screenshot
+
+            Situations (both sides; clock, traffic and score start again)
+              F5  morning rush     F6  evening rush    F7  stress test (200% traffic)
 
             Display
               H  this help   Esc  quit""";

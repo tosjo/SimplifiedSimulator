@@ -122,6 +122,9 @@ final class DuelSimulator extends SimpleApplication implements ActionListener {
         map(LESS, KeyInput.KEY_LBRACKET);
         map(EXPORT, KeyInput.KEY_X);
         map(HELP, KeyInput.KEY_H, KeyInput.KEY_F1);
+        for (Preset preset : Preset.values()) {
+            map(preset.mapping(), preset.key());
+        }
     }
 
     private void map(String name, int... keys) {
@@ -148,10 +151,15 @@ final class DuelSimulator extends SimpleApplication implements ActionListener {
             case LESS -> setDemandScale(left.demandScale() - 0.1);
             case EXPORT -> exportStatistics();
             case HELP -> hud.toggleHelp();
-            default -> {
-                // not ours
-            }
+            default -> Preset.forMapping(name).ifPresent(this::applyPreset);
         }
+    }
+
+    private void applyPreset(Preset preset) {
+        // both sides at once, so the new situation starts level
+        preset.apply(left);
+        preset.apply(right);
+        hud.flash(preset.description() + " on both sides, score restarted");
     }
 
     private void setSpeed(double value) {
