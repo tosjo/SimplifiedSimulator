@@ -278,27 +278,48 @@ class ServerTest(unittest.TestCase):
                 session.join(5)
                 ctrl_side.close()
 
-    def test_once_stops_after_the_simulator_disconnects(self):
+    def _connect(self, port):
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                return socket.create_connection(("localhost", port), timeout=1)
+            except OSError:
+                if time.monotonic() > deadline:
+                    raise
+                time.sleep(0.05)
+
+    def _start_once(self):
         probe = c.open_server("localhost", 0)
         port = probe.getsockname()[1]
         probe.close()
         result = []
+        runner = threading.Thread(target=lambda: result.append(c.main(["--port", str(port), "--once"])), daemon=True)
+        runner.start()
+        return port, runner, result
+
+    def test_once_stops_after_the_simulator_disconnects(self):
         with contextlib.redirect_stdout(io.StringIO()):
-            runner = threading.Thread(target=lambda: result.append(c.main(["--port", str(port), "--once"])))
-            runner.start()
-            deadline = time.monotonic() + 5
-            while True:
-                try:
-                    sim = socket.create_connection(("localhost", port), timeout=1)
-                    break
-                except OSError:
-                    if time.monotonic() > deadline:
-                        raise
-                    time.sleep(0.05)
+            port, runner, result = self._start_once()
+            sim = self._connect(port)
             sim.recv(4096)  # name and startup lights
+            time.sleep(c.SHORTEST_SESSION + 0.2)  # a real session lasts a while
             sim.close()
             runner.join(5)
         self.assertFalse(runner.is_alive(), "the controller stopped by itself")
+        self.assertEqual([0], result)
+
+    def test_once_ignores_a_connection_that_closes_straight_away(self):
+        # some other program on the PC may knock on the port before the simulator connects
+        with contextlib.redirect_stdout(io.StringIO()):
+            port, runner, result = self._start_once()
+            self._connect(port).close()
+            time.sleep(0.5)
+            self.assertTrue(runner.is_alive(), "still waiting for the simulator")
+            sim = self._connect(port)
+            time.sleep(c.SHORTEST_SESSION + 0.2)
+            sim.close()
+            runner.join(5)
+        self.assertFalse(runner.is_alive())
         self.assertEqual([0], result)
 
     def test_reports_a_port_that_is_in_use(self):

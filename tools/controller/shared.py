@@ -149,6 +149,11 @@ def encode_clockdone(time_):
 # Server: the simulator connects to us
 # --------------------------------------------------------------------------------------
 
+# A connection that closes within this many seconds was not the simulator, but another program
+# on this PC knocking on the port (Razer's app engine checks port 1337 about once a minute).
+SHORTEST_SESSION = 1.0
+
+
 def log(message):
     print(time.strftime("%H:%M:%S"), message, flush=True)
 
@@ -279,11 +284,15 @@ def run_server(args, make_controller, mode, simulator_hint):
                 except socket.timeout:
                     continue
                 log("Simulator connected from %s:%d" % address)
+                started = time.monotonic()
                 with conn:
                     try:
                         serve_session(conn, clock, make_controller, args.verbose, args.tick)
                     except OSError:
                         pass  # the simulator went away mid-message; same as a normal disconnect
+                if time.monotonic() - started < SHORTEST_SESSION:
+                    log("That connection closed straight away, so it was not the simulator. Still waiting.")
+                    continue
                 if args.once:
                     log("Simulator disconnected. Stopped.")
                     return 0
