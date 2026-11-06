@@ -46,3 +46,12 @@ application {
 tasks.test {
     useJUnitPlatform()
 }
+
+// Headless comparison of signal controllers, for example:
+//   ./gradlew batch --args="--controllers fixed,actuated --seeds 3 --duration 3600"
+tasks.register<JavaExec>("batch") {
+    group = "application"
+    description = "Runs the simulation without graphics and compares signal controllers."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("simplifiedsimulator.batch.BatchRunner")
+}
