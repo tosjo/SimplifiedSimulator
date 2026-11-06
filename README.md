@@ -61,6 +61,7 @@ standalone copy with start scripts in `build/install/simplified-simulator/`.
 | `[` / `]` | Less / more traffic |
 | `T` / `G` / `H` | Signal timeline / statistics / help |
 | `X` | Save the statistics as CSV |
+| `F5` / `F6` / `F7` | Situations: morning rush (07:30), evening rush (17:00, 110% traffic), stress test (08:00, 200% traffic). The clock and traffic jump there, the road users stay and the statistics start again |
 | `F12` | Screenshot |
 
 ### Options
@@ -100,7 +101,8 @@ camera of the right half follows the left one, so you always look at the same sp
 The scoreboard at the top shows who leads on vehicle delay, and compares stops, delay
 for buses, cyclists and pedestrians, vehicles through and the queue right now; the better
 value is green. Each side shows its safety record, in red as soon as anything unsafe
-happens. Speed, pause and traffic keys work on both sides at once, `R` reconnects the
+happens. Speed, pause, traffic and the situation keys `F5`-`F7` work on both sides at once (a
+situation also restarts the score), `R` reconnects the
 external controllers and `X` saves both sides' statistics in one CSV. Clicking a road user
 and switching controllers are off, since the sides have different road users and a
 switch would spoil the score.

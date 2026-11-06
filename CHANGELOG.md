@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The project follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-11-06
+
+### Added
+- Situations on the function keys, in the single view and in a duel: `F5` morning rush
+  (07:30, 100% traffic), `F6` evening rush (17:00, 110%) and `F7` stress test (08:00, 200%).
+  The clock and traffic level jump there, the road users on the map stay, and the statistics
+  (and the duel score) start again.
+
 ## [1.2.1] - 2026-11-06
 
 ### Fixed

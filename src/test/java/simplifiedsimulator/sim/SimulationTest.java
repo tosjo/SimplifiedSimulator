@@ -38,6 +38,45 @@ class SimulationTest {
     }
 
     @Test
+    void jumpingTheClockChangesTheTimeOfDayButNotTheSimulatedTime() {
+        Simulation sim = new Simulation(NETWORK, SimulationOptions.defaults().withStartTimeOfDay(13 * 3600));
+        sim.run(60);
+        sim.jumpToTimeOfDay(17 * 3600);
+        assertEquals(17 * 3600, sim.timeOfDay(), 1e-6);
+        assertEquals(60, sim.time(), 1e-6);
+        sim.run(30);
+        assertEquals(17 * 3600 + 30, sim.timeOfDay(), 1e-6);
+    }
+
+    @Test
+    void jumpingBackPastMidnightWrapsTheClock() {
+        Simulation sim = new Simulation(NETWORK, SimulationOptions.defaults().withStartTimeOfDay(23 * 3600));
+        sim.jumpToTimeOfDay(10);
+        sim.run(20);
+        assertEquals(30, sim.timeOfDay(), 1e-6);
+    }
+
+    @Test
+    void trafficFollowsTheClockAfterAJump() {
+        Simulation night = new Simulation(NETWORK, SimulationOptions.defaults().withSeed(4));
+        night.jumpToTimeOfDay(2 * 3600);
+        night.run(600);
+        Simulation rush = new Simulation(NETWORK, SimulationOptions.defaults().withSeed(4));
+        rush.jumpToTimeOfDay(7.5 * 3600);
+        rush.run(600);
+        assertTrue(rush.arrivals() > 4 * night.arrivals(),
+                "rush " + rush.arrivals() + " against night " + night.arrivals());
+    }
+
+    @Test
+    void clockOnlyJumpsToATimeOfDay() {
+        Simulation sim = Simulation.createDefault();
+        for (double bad : new double[] {-1, 86_400, Double.NaN}) {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> sim.jumpToTimeOfDay(bad));
+        }
+    }
+
+    @Test
     void carsStopAtARedLight() {
         Simulation sim = only(Map.of("W2_T", 600.0), 1);
         sim.setController(TestControllers.allRed());

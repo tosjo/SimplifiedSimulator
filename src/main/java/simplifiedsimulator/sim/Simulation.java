@@ -86,6 +86,8 @@ public final class Simulation implements SimulationView {
     private double time;
     private long nextId = 1;
     private long arrivals;
+    /** Seconds added to the clock by {@link #jumpToTimeOfDay}. */
+    private double clockOffset;
     private double nextSample = 60;
     private double nextQueueUpdate;
     private int redLightRuns;
@@ -156,7 +158,19 @@ public final class Simulation implements SimulationView {
 
     @Override
     public double timeOfDay() {
-        return (options.startTimeOfDay() + time) % 86400;
+        double t = (options.startTimeOfDay() + time + clockOffset) % 86400;
+        return t < 0 ? t + 86400 : t;
+    }
+
+    /**
+     * Sets the clock to a time of day, for example to try the evening rush. Traffic volumes and
+     * daylight follow the clock; the simulated time, the road users and the lights are kept.
+     */
+    public void jumpToTimeOfDay(double secondsOfDay) {
+        if (!(secondsOfDay >= 0 && secondsOfDay < 86400)) {
+            throw new IllegalArgumentException("Time of day must be between 00:00 and 23:59:59, got " + secondsOfDay);
+        }
+        clockOffset += secondsOfDay - timeOfDay();
     }
 
     @Override
