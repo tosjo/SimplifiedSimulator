@@ -1,171 +1,194 @@
 # Simplified Simulator
 
-A 3D traffic simulation of a single, busy crossroad, built with
-[jMonkeyEngine](https://jmonkeyengine.org/). Cars, buses and cyclists enter
-the crossroad according to a scenario file and follow recorded routes. They stop
-at red lights and queue behind each other. The traffic lights are switched by an
-external **traffic light controller** that talks to the simulator over TCP. A
-built-in fixed-time controller is included so the simulator can also run on its
-own.
+[![Build](https://github.com/tosjo/SimplifiedSimulator/actions/workflows/build.yml/badge.svg)](https://github.com/tosjo/SimplifiedSimulator/actions/workflows/build.yml)
 
-![Screenshot of the simulator](docs/screenshot.jpg)
+A 3D traffic simulation of a real crossing in Leeuwarden: the Harlingerstraatweg with the
+Douwe Kalmaleane and the Slauerhoffweg, next to the glass Crystallic building. Cars, vans,
+lorries, buses, cyclists and pedestrians cross it under Dutch-style traffic light control,
+and the simulator shows how well each controller handles the traffic.
 
-The simulator started as a school project in 2014, made by Toby Zeldenrust and
-Herman ten Hoor. It is the visual half of a traffic control system: a separate
-controller application decides when each light changes, and the simulator shows
-the effect on the traffic and reports waiting road users back to it. The code has
-since been modernised: it now builds with Gradle on current Java and
-jMonkeyEngine versions, the networking runs off the render thread, and the
-scenario, route and protocol code has unit tests.
+![The crossing on a June afternoon, with the statistics and the signal timeline](docs/app-overview.jpg)
 
-## Requirements
+Everything you see is built from open data about the real place:
 
-- JDK 17 or newer
-- A graphics card or driver that supports OpenGL 3.2 (not needed for headless runs)
+- **Lanes, stop lines and traffic lights** from OpenStreetMap, checked lane by lane against
+  the aerial photo.
+- **The ground** is the PDOK aerial photo (8 cm per pixel), with the cars that happened to
+  be on the road removed by combining the photos of 2024, 2025 and 2026.
+- **616 buildings** with their real roof shapes from 3D BAG.
+- **879 trees** at their real positions and heights, found in the national height model (AHN).
 
-Gradle does not need to be installed, because the wrapper downloads it.
+The simulator started in 2014 as a school project by Toby Zeldenrust and Herman ten Hoor,
+using a drawing of this crossing as it was then (see [the original map](docs/2014-map.png)).
+The crossing has since been rebuilt, and so has the simulator.
 
-## Running
+| Rush hour at street level | Dusk |
+| --- | --- |
+| ![Evening queue on the Harlingerstraatweg](docs/app-street.jpg) | ![The crossing at dusk](docs/render-dusk.jpg) |
+| ![Pedestrian light and waiting traffic](docs/render-signals.jpg) | ![Night](docs/app-night.jpg) |
+| ![Cyclists in front of the Crystallic building](docs/render-cyclists.jpg) | |
+
+## Running it
+
+You need JDK 17 or newer and a graphics card with OpenGL 3.2. Gradle downloads everything
+else.
+
+**IntelliJ IDEA:** *File → Open* the cloned folder. IntelliJ recognises the Gradle project;
+pick **Run Simulator** in the run configurations and press ▶.
+
+**Command line:**
 
 ```sh
-./gradlew run                                   # large scenario, waits for a controller
-./gradlew run --args="--demo"                   # use the built-in light controller
-./gradlew run --args="--host 192.168.1.20 --port 1337 --connect --scenario small"
+./gradlew run                                        # morning rush, smart controller
+./gradlew run --args="--start 17:00 --speed 4"       # evening rush, four times as fast
+./gradlew run --args="--controller fixed"            # compare with a fixed-time plan
 ```
 
-On Windows, use `gradlew.bat` instead of `./gradlew`.
-
-To build a standalone distribution with start scripts, run `./gradlew installDist`.
-The output goes to `build/install/simplified-simulator/`.
-
-### Options
-
-| Option              | Default     | Description                                                       |
-|---------------------|-------------|-------------------------------------------------------------------|
-| `--host <name>`     | `localhost` | Host of the traffic light controller                              |
-| `--port <number>`   | `1337`      | Port of the traffic light controller                              |
-| `--scenario <name>` | `large`     | `small`, `medium`, `large`, or the path to your own scenario file |
-| `--connect`         |             | Connect to the controller on start-up                             |
-| `--demo`            |             | Start with the built-in fixed-time light controller               |
-| `--headless`        |             | Run without a window, for example to test a controller            |
-| `--duration <sec>`  | `0` (off)   | Quit after this many seconds                                      |
-| `--record <file>`   |             | Draw a new route on the map instead of simulating (see below)     |
+On Windows, use `gradlew.bat` instead of `./gradlew`. `./gradlew installDist` builds a
+standalone copy with start scripts in `build/install/simplified-simulator/`.
 
 ### Controls
 
-| Key                     | Action                                          |
-|-------------------------|-------------------------------------------------|
-| `Space`                 | Connect to the traffic light controller         |
-| `L`                     | Turn the built-in demo light controller on/off  |
-| `G` / `R`               | Set all lights to green / red (manual override) |
-| `W` `A` `S` `D` `Q` `Z` | Move the camera                                 |
-| Mouse drag              | Rotate the camera                               |
-| `Esc`                   | Quit                                            |
+| Key | Action |
+| --- | --- |
+| Drag / right-drag / wheel | Rotate / move / zoom the camera |
+| `W` `A` `S` `D` | Move the camera; `F` switches to free flight (`Q`/`E` down/up) |
+| Click a road user | Follow it and see why it waits; `V` driver's view, `Backspace` stop |
+| `1` – `6` | Viewpoints: overview, from above, and street level on every approach |
+| `Space` or `P` | Pause |
+| `+` / `-` | Faster / slower (up to 64 times real time) |
+| `C` | Next controller: vehicle actuated → fixed time → external |
+| `[` / `]` | Less / more traffic |
+| `T` / `G` / `H` | Signal timeline / statistics / help |
+| `X` | Save the statistics as CSV |
+| `F12` | Screenshot |
+
+### Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--controller <name>` | `actuated` | `actuated`, `fixed` or `external` |
+| `--start <HH:MM>` | `07:30` | Time of day to start; traffic and daylight follow the clock |
+| `--speed <factor>` | `1` | Simulation speed |
+| `--scale <factor>` | `1` | Multiply all traffic volumes |
+| `--demand <file.csv>` | built in | Your own traffic volumes per route |
+| `--seed <number>` | `1` | Random seed; the same seed gives the same traffic |
+| `--host`, `--port` | `localhost:1337` | Address of an external controller |
+| `--quality <level>` | `high` | `high`, `medium` or `low` |
+| `--date <YYYY-MM-DD>` | today | Date for the position of the sun |
+| `--camera <view>` | `overview` | `overview`, `birds_eye`, `street_west`, `street_east`, `street_north`, `street_south` |
+| `--headless --duration <sec>` | | Run without a window and print the results (`--csv <file>` to save them) |
+| `--screenshot <file> --duration <sec>` | | Simulate, save one picture and exit |
+
+## Comparing controllers
+
+The batch runner simulates without graphics, about ten seconds per simulated hour:
+
+```sh
+./gradlew batch --args="--controllers fixed,actuated --seeds 4 --duration 7200 --start 07:00"
+```
+
+Two hours of morning rush, averaged over four random seeds:
+
+| Controller | Vehicles | Average delay | Stops | Cyclists | Pedestrians | Buses |
+| --- | --- | --- | --- | --- | --- | --- |
+| Vehicle actuated | 4906 | 87 s | 1.29 | 62 s | 36 s | 30 s |
+| Fixed time (120 s cycle) | 4699 | 133 s | 1.78 | 127 s | 28 s | 56 s |
+
+The actuated controller gives green where traffic is waiting and stretches it while
+vehicles keep coming, so it moves more traffic with less waiting. Pedestrians do slightly
+better with the fixed plan, because it gives them green in every cycle without having to
+press the button first.
 
 ## How it works
 
+### Driving
+
+Every road user follows a route: an approach lane, a path across the crossing and an exit
+lane. Speed is decided by the
+[Intelligent Driver Model](https://en.wikipedia.org/wiki/Intelligent_driver_model): drivers
+keep a safe time gap to whoever is ahead, accelerate and brake smoothly, and slow down for
+turns. Every driver gets slightly different settings, so some are more patient than others.
+At amber a driver stops if that is possible with comfortable braking, and otherwise drives
+on, like the Dutch rule.
+
+Where paths cross or merge, road users never drive through each other: whoever is already
+on the conflict area goes first, slip roads give way, and nobody enters an area they cannot
+leave. Buses stop at the real *Westeinde* bus stop.
+
+### Signal control
+
+Signal groups are numbered the Dutch way: 01-12 motor traffic, 22-26 cyclists, 32-36
+pedestrians and 41-42 buses. The simulator works out from the geometry which groups
+conflict and the minimum time between one ending and the other starting (the intergreen
+time, *ontruimingstijd*).
+
+- **Vehicle actuated** (default): detection loops in the road, cyclist detectors and push
+  buttons request green. The controller cycles through blocks of compatible groups, skips
+  directions nobody is waiting for, extends green while loops keep detecting traffic, gives
+  extra green to groups that fit in, and gives buses priority.
+- **Fixed time**: the same blocks with a fixed 120 s cycle, the green split according to
+  Webster.
+- **External**: an external controller program switches the lights over TCP (see below).
+  The simulator counts conflicting greens instead of preventing them, so it is a test bench
+  for your own controller.
+
+### Traffic
+
+`src/main/resources/crossing/demand.csv` holds the traffic per route in the busiest hour,
+and `profile.csv` how that varies over the day, with morning and evening peaks. Road users
+arrive at random (Poisson) at those rates. There are no public counts for this crossing, so
+the volumes are estimates; if you have real counts, put them in a copy of the file and
+start with `--demand`.
+
+### External controller protocol
+
+The simulator is the TCP client. Messages are JSON objects, each followed by a NUL byte
+(`\0`). The ids are signal group numbers (`2` for group 02, `41` for group 41).
+
+When a road user arrives at a detector, the simulator sends:
+
+```json
+{"sensorstate":{"id":2}}
+```
+
+To switch a group, the controller sends this, with `state` `0` for red, `1` for amber and
+`2` for green:
+
+```json
+{"lightstate":{"id":2,"state":2}}
+```
+
+This is the protocol of the original 2014 project, so its controllers still work, with the
+new group numbers.
+
+## Project layout
+
 ```
 src/main/java/simplifiedsimulator
-├── Main.java                  command line parsing, jME start-up
-├── SimplifiedSimulator.java   the application: spawning, update loop, HUD, keys
-├── Vehicle.java               a road user that follows its route and waits when blocked
-├── TrafficLight.java          a light with a stop zone and a sensor
-├── TrafficLightLayout.java    light positions and the demo light phases
-├── DemoLightController.java   fixed-time controller for running without a server
-├── CrossroadScene.java        the textured crossroad floor
-├── RouteRecorderState.java    drawing new routes on the map
-├── scenario/                  scenario (XML) and route file parsing
-└── net/                       controller protocol and TCP client
+├── Main.java, SimulatorConfig.java   start-up and command line options
+├── SimplifiedSimulator.java          the application window and keys
+├── network/    lanes, routes, signal groups and detectors of the crossing
+├── sim/        the simulation: driver model, conflicts, road users
+├── control/    conflict matrix, intergreen times, the controllers
+├── demand/     traffic volumes and arrivals
+├── stats/      delay, stops, queues and CSV export
+├── batch/      comparing controllers without graphics
+├── render/     the 3D world: ground, buildings, trees, lights, vehicles, sky, cameras
+├── ui/         statistics, signal timeline and help on screen
+└── net/        TCP connection to an external controller
+tools/crossing/   scripts that build the crossing data from the open sources
 ```
 
-Every frame, each road user checks whether it touches the stop zone of a light
-that is not green, or a road user that entered before it. If it does, its motion
-pauses until the way is clear. Because only the newer of two road users waits,
-queues can never deadlock. The first road user to reach a light's stop zone
-triggers that light's sensor, which sends a message to the controller.
+`./gradlew build` compiles and runs the tests, which include two hours of rush-hour traffic
+per controller checked for collisions, conflicting greens and deadlocks.
 
-### Controller protocol
+## Data and licences
 
-The simulator is the TCP client and the controller is the server. Messages in
-both directions are JSON objects, each terminated by a NUL byte (`\0`).
+The crossing data in `src/main/resources/crossing` is generated by the scripts in
+[`tools/crossing`](tools/crossing/README.md):
 
-When a road user arrives at light `id`, the simulator sends:
-
-```json
-{"sensorstate":{"id":5}}
-```
-
-The sensor fires at most once per light phase. It is re-armed when the light
-turns red or green again.
-
-To switch a light, the controller sends this message. The `state` value is
-`0` for red, `1` for orange and `2` for green:
-
-```json
-{"lightstate":{"id":5,"state":2}}
-```
-
-Keys are matched case-insensitively. Messages that cannot be parsed are logged
-and ignored.
-
-The light ids match the numbers on the map: 1–15 are car lights, 21–25 cycle
-lights and 51–53 bus lights.
-
-### Scenario files
-
-A scenario lists the road users to spawn. `Time` is the number of seconds after
-the start of the simulation, and `StartPoint` and `EndPoint` are the entry and
-exit numbers from the map.
-
-```xml
-<Data>
-  <Item><Type>2</Type><StartPoint>8</StartPoint><EndPoint>2</EndPoint><Time>0</Time></Item>
-  <Item><Type>3</Type><StartPoint>18</StartPoint><EndPoint>7</EndPoint><Time>4</Time></Item>
-</Data>
-```
-
-| Type | Road user                                   |
-|------|---------------------------------------------|
-| 0    | Cyclist (blue)                              |
-| 1    | Pedestrian (not simulated)                  |
-| 2    | Car (green)                                 |
-| 3    | Bus (yellow)                                |
-| 4    | Other vehicle (grey)                        |
-
-The built-in scenarios have 150 (`small`), 400 (`medium`) and 1200 (`large`)
-road users.
-
-### Route files
-
-Each route from entry point `a` to exit point `b` is stored in
-`src/main/resources/routes/a-b.txt`, as a list of waypoints in world
-coordinates:
-
-```
-(-15.618567, 1.5, 251.05597)(-14.261513, 1.5, 223.41939)(-13.113906, 1.5, 193.11407)
-```
-
-The height value is ignored. Road users that need a route with no file are
-skipped, and a warning is logged. The built-in scenarios use one route that was
-never recorded, `1-4`.
-
-To add a route, start the simulator in recording mode:
-
-```sh
-./gradlew run --args="--record build/1-4.txt"
-```
-
-Right-click on the map to add waypoints along the lane, then press `Enter` to
-save them. `Backspace` removes the last waypoint and `C` starts over. Copy the
-saved file into `src/main/resources/routes/`.
-
-## Tests
-
-```sh
-./gradlew test
-```
-
-The tests cover scenario and route parsing, route recording, the controller
-protocol, the TCP client (against a local server socket), the command line
-options and the demo light controller. CI also runs the simulator headless for
-20 seconds as a smoke test.
+- Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL).
+- Aerial photos: Beeldmateriaal Nederland via [PDOK](https://www.pdok.nl), CC BY 4.0.
+- Buildings: [3D BAG](https://3dbag.nl) by 3DGI and TU Delft, CC BY 4.0.
+- Height model: [AHN](https://www.ahn.nl) via PDOK, CC0.

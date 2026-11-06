@@ -1,268 +1,240 @@
 package simplifiedsimulator;
 
 import com.jme3.app.SimpleApplication;
-import com.jme3.font.BitmapText;
+import com.jme3.app.state.ScreenshotAppState;
 import com.jme3.input.KeyInput;
 import com.jme3.input.controls.ActionListener;
 import com.jme3.input.controls.KeyTrigger;
-import com.jme3.math.ColorRGBA;
-import com.jme3.math.Vector3f;
-import com.jme3.scene.Geometry;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
+import java.io.IOException;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import java.util.Locale;
+import java.util.logging.Level;
 import java.util.logging.Logger;
-import simplifiedsimulator.net.ControllerClient;
-import simplifiedsimulator.net.LightState;
-import simplifiedsimulator.net.LightUpdate;
-import simplifiedsimulator.net.ProtocolCodec;
-import simplifiedsimulator.scenario.RouteRepository;
-import simplifiedsimulator.scenario.SpawnEvent;
+import simplifiedsimulator.control.ExternalController;
+import simplifiedsimulator.control.SignalControllers;
+import simplifiedsimulator.network.Network;
+import simplifiedsimulator.render.CrossingRenderer;
+import simplifiedsimulator.sim.Simulation;
+import simplifiedsimulator.ui.AppStatus;
+import simplifiedsimulator.ui.HudState;
+import simplifiedsimulator.ui.ScreenshotCapture;
 
 /**
- * Traffic simulation of a single crossroad. Road users are spawned from a scenario
- * file and follow pre-recorded routes. Traffic lights are switched either by an
- * external controller over TCP or by the built-in demo controller.
+ * The simulator window: runs the traffic simulation of the crossing in real time (or faster),
+ * renders it in 3D and shows statistics and controls.
  */
 public final class SimplifiedSimulator extends SimpleApplication implements ActionListener {
 
     private static final Logger LOG = Logger.getLogger(SimplifiedSimulator.class.getName());
+    private static final double MIN_SPEED = 0.25;
+    private static final double MAX_SPEED = 64;
+    /** Upper limit of simulation work per frame, so the window stays responsive at high speeds. */
+    private static final double MAX_STEPS_PER_FRAME = 400;
 
-    private static final String CONNECT = "Connect";
-    private static final String TOGGLE_DEMO = "ToggleDemo";
-    private static final String ALL_GREEN = "AllGreen";
-    private static final String ALL_RED = "AllRed";
+    private static final String PAUSE = "Sim.Pause";
+    private static final String FASTER = "Sim.Faster";
+    private static final String SLOWER = "Sim.Slower";
+    private static final String CONTROLLER = "Sim.Controller";
+    private static final String RECONNECT = "Sim.Reconnect";
+    private static final String MORE = "Sim.MoreTraffic";
+    private static final String LESS = "Sim.LessTraffic";
+    private static final String EXPORT = "Sim.Export";
+    private static final String HELP = "Hud.Help";
+    private static final String TIMELINE = "Hud.Timeline";
+    private static final String STATS = "Hud.Statistics";
 
     private final SimulatorConfig config;
-    private final RouteRepository routes = new RouteRepository();
-    private final Map<Integer, TrafficLight> lights = new LinkedHashMap<>();
-    private final List<Vehicle> vehicles = new ArrayList<>();
-    private final DemoLightController demoController;
-    private final ControllerClient client;
+    private final Simulation simulation;
+    private CrossingRenderer renderer;
+    private HudState hud;
+    private String controllerName;
+    private double speed;
+    private boolean paused;
+    private double accumulator;
+    private int frames;
+    private float fpsTime;
+    private int fpsFrames;
+    private int fps;
 
-    private final List<SpawnEvent> events;
-    private int nextEvent;
-    private int nextVehicleId;
-    private int finishedCount;
-    private float elapsed;
-    private boolean demoActive;
-    private boolean connecting;
-    private BitmapText hud;
-
-    /**
-     * @param config options from the command line
-     * @param events road users to spawn, ordered by time
-     */
-    public SimplifiedSimulator(SimulatorConfig config, List<SpawnEvent> events) {
+    SimplifiedSimulator(SimulatorConfig config, Simulation simulation) {
         super();
         this.config = config;
-        this.events = List.copyOf(events);
-        this.demoController = new DemoLightController(TrafficLightLayout.DEMO_PHASES, this::setLight);
-        // Network messages arrive on a background thread; jME scene changes must
-        // happen on the render thread, so updates are queued.
-        this.client = new ControllerClient(config.host(), config.port(),
-                update -> enqueue(() -> applyControllerUpdate(update)));
+        this.simulation = simulation;
+        this.speed = config.speed();
+        this.controllerName = config.controller();
     }
 
     @Override
     public void simpleInitApp() {
         setDisplayStatView(false);
         setDisplayFps(false);
-        viewPort.setBackgroundColor(new ColorRGBA(0.55f, 0.7f, 0.85f, 1f));
-        cam.setLocation(new Vector3f(0f, 390f, 245f));
-        cam.lookAt(new Vector3f(0f, 0f, 5f), Vector3f.UNIT_Y);
-
-        if (flyCam != null) {
-            flyCam.setMoveSpeed(150f);
-            flyCam.setDragToRotate(true);
-        }
-
-        Geometry floor = CrossroadScene.createFloor(assetManager);
-        rootNode.attachChild(floor);
-        for (TrafficLightLayout.Placement placement : TrafficLightLayout.PLACEMENTS) {
-            TrafficLight light = new TrafficLight(placement.id(), placement.x(), placement.z(), assetManager);
-            lights.put(light.id(), light);
-            rootNode.attachChild(light.node());
-        }
-
-        if (config.recordTo() != null) {
-            stateManager.attach(new RouteRecorderState(floor, config.recordTo()));
-        }
-
-        if (inputManager != null) {
-            setUpKeys();
-            if (config.recordTo() == null) {
-                setUpHud();
+        // the default "C prints the camera position" and "M prints memory" keys are not wanted here
+        for (String mapping : List.of(INPUT_MAPPING_CAMERA_POS, INPUT_MAPPING_MEMORY, INPUT_MAPPING_HIDE_STATS)) {
+            if (inputManager.hasMapping(mapping)) {
+                inputManager.deleteMapping(mapping);
             }
         }
-        if (config.demo()) {
-            setDemoActive(true);
+
+        Network network = simulation.network();
+        renderer = new CrossingRenderer(network, config.quality());
+        renderer.setDate(config.date());
+        stateManager.attach(renderer);
+        boolean screenshot = config.screenshot() != null;
+        // a screenshot shows the moment as if the simulation were running normally
+        hud = new HudState(() -> simulation, renderer,
+                () -> screenshot ? new AppStatus(speed, false, -1) : new AppStatus(speed, paused, fps));
+        stateManager.attach(hud);
+
+        if (screenshot) {
+            // render a frozen moment: the simulation has already run for --duration seconds
+            paused = true;
+            guiViewPort.addProcessor(new ScreenshotCapture(config.screenshot(), 10, this::screenshotSaved));
+        } else {
+            ScreenshotAppState screenshots = new ScreenshotAppState("", "simplified-simulator");
+            stateManager.attach(screenshots);
+            inputManager.addMapping("ScreenShot", new KeyTrigger(KeyInput.KEY_F12));
+            addKeys();
         }
-        if (config.connect()) {
-            connect();
+    }
+
+    private void addKeys() {
+        map(PAUSE, KeyInput.KEY_SPACE, KeyInput.KEY_P);
+        map(FASTER, KeyInput.KEY_EQUALS, KeyInput.KEY_ADD);
+        map(SLOWER, KeyInput.KEY_MINUS, KeyInput.KEY_SUBTRACT);
+        map(CONTROLLER, KeyInput.KEY_C);
+        map(RECONNECT, KeyInput.KEY_R);
+        map(MORE, KeyInput.KEY_RBRACKET);
+        map(LESS, KeyInput.KEY_LBRACKET);
+        map(EXPORT, KeyInput.KEY_X);
+        map(HELP, KeyInput.KEY_H, KeyInput.KEY_F1);
+        map(TIMELINE, KeyInput.KEY_T);
+        map(STATS, KeyInput.KEY_G);
+    }
+
+    private void map(String name, int... keys) {
+        for (int key : keys) {
+            inputManager.addMapping(name, new KeyTrigger(key));
+        }
+        inputManager.addListener(this, name);
+    }
+
+    @Override
+    public void onAction(String name, boolean pressed, float tpf) {
+        if (!pressed) {
+            return;
+        }
+        switch (name) {
+            case PAUSE -> {
+                paused = !paused;
+                hud.flash(paused ? "Paused" : "Running");
+            }
+            case FASTER -> setSpeed(speed * 2);
+            case SLOWER -> setSpeed(speed / 2);
+            case CONTROLLER -> nextController();
+            case RECONNECT -> reconnect();
+            case MORE -> setDemandScale(simulation.demandScale() + 0.1);
+            case LESS -> setDemandScale(simulation.demandScale() - 0.1);
+            case EXPORT -> exportStatistics();
+            case HELP -> hud.toggleHelp();
+            case TIMELINE -> hud.toggleTimeline();
+            case STATS -> hud.toggleStatistics();
+            default -> {
+                // not ours
+            }
+        }
+    }
+
+    private void setSpeed(double value) {
+        speed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, value));
+        hud.flash(String.format(Locale.ROOT, "Speed %s", speed >= 1 ? (long) speed + "x" : "1/" + (long) (1 / speed) + "x"));
+    }
+
+    private void setDemandScale(double value) {
+        double scale = Math.max(0, Math.min(3, Math.round(value * 10) / 10.0));
+        simulation.setDemandScale(scale);
+        hud.flash(String.format(Locale.ROOT, "Traffic %.0f%% of the estimated volumes", scale * 100));
+    }
+
+    private void nextController() {
+        List<String> names = SignalControllers.NAMES;
+        controllerName = names.get((names.indexOf(controllerName) + 1) % names.size());
+        simulation.setController(SignalControllers.create(controllerName, config.host(), config.port()));
+        hud.flash(simulation.controller().name());
+    }
+
+    private void reconnect() {
+        if (simulation.controller() instanceof ExternalController external) {
+            external.connect();
+            hud.flash("Connecting to " + config.host() + ":" + config.port());
+        } else {
+            hud.flash("Press C to switch to the external controller first");
+        }
+    }
+
+    private void exportStatistics() {
+        String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+        Path file = Path.of("statistics-" + stamp + ".csv");
+        try (Writer out = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
+            simulation.statistics().writeMovementsCsv(out, simulation.time());
+            hud.flash("Saved " + file.toAbsolutePath());
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Cannot save statistics", e);
+            hud.flash("Could not save statistics: " + e.getMessage());
         }
     }
 
     @Override
     public void simpleUpdate(float tpf) {
-        elapsed += tpf;
-
-        if (demoActive) {
-            demoController.update(tpf);
+        frames++;
+        if (frames == 2) {
+            // the camera rig exists once the renderer has been initialised
+            renderer.cameraRig().preset(config.camera());
         }
+        countFps(tpf);
 
-        while (nextEvent < events.size() && events.get(nextEvent).time() <= elapsed) {
-            spawn(events.get(nextEvent++));
-        }
-
-        for (Vehicle vehicle : vehicles) {
-            vehicle.update(lights.values(), vehicles);
-            for (TrafficLight light : lights.values()) {
-                if (light.triggerSensor(vehicle)) {
-                    client.send(ProtocolCodec.encodeSensor(light.id()));
-                }
+        double dt = simulation.options().timeStep();
+        if (!paused) {
+            accumulator += tpf * speed;
+            accumulator = Math.min(accumulator, MAX_STEPS_PER_FRAME * dt);
+            while (accumulator >= dt) {
+                simulation.step();
+                accumulator -= dt;
             }
         }
-
-        for (Iterator<Vehicle> it = vehicles.iterator(); it.hasNext(); ) {
-            Vehicle vehicle = it.next();
-            if (vehicle.isFinished()) {
-                vehicle.remove();
-                it.remove();
-                finishedCount++;
-            }
-        }
-
-        if (hud != null) {
-            hud.setText(statusText());
-        }
-        if (config.duration() > 0 && elapsed >= config.duration()) {
-            LOG.info(() -> String.format("Stopping after %d s: %d spawned, %d finished, %d on the road",
-                    config.duration(), nextVehicleId, finishedCount, vehicles.size()));
+        renderer.update(simulation, (float) (accumulator / dt));
+        if (config.duration() > 0 && config.screenshot() == null && simulation.time() >= config.duration()) {
             stop();
         }
     }
 
+    private void countFps(float tpf) {
+        fpsTime += tpf;
+        fpsFrames++;
+        if (fpsTime >= 1) {
+            fps = Math.round(fpsFrames / fpsTime);
+            fpsTime = 0;
+            fpsFrames = 0;
+        }
+    }
+
+    private void screenshotSaved() {
+        System.out.println("Saved " + config.screenshot().toAbsolutePath());
+        stop();
+    }
+
     @Override
     public void destroy() {
-        client.close();
-        super.destroy();
-    }
-
-    @Override
-    public void onAction(String binding, boolean isPressed, float tpf) {
-        if (!isPressed) {
-            return;
-        }
-        switch (binding) {
-            case CONNECT -> connect();
-            case TOGGLE_DEMO -> setDemoActive(!demoActive);
-            case ALL_GREEN -> setAllLights(LightState.GREEN);
-            case ALL_RED -> setAllLights(LightState.RED);
-            default -> {
-            }
-        }
-    }
-
-    private void spawn(SpawnEvent event) {
-        RoadUserType type;
         try {
-            type = RoadUserType.fromCode(event.type());
-        } catch (IllegalArgumentException e) {
-            LOG.warning(() -> "Skipping event with " + e.getMessage());
-            return;
+            simulation.controller().close();
+        } catch (RuntimeException e) {
+            LOG.log(Level.FINE, "Error while closing the controller", e);
         }
-        if (!type.isSimulated()) {
-            return;
-        }
-        routes.find(event.startPoint(), event.endPoint()).ifPresent(route -> {
-            Vehicle vehicle = new Vehicle(nextVehicleId++, type, route, assetManager);
-            vehicles.add(vehicle);
-            rootNode.attachChild(vehicle.geometry());
-        });
-    }
-
-    private void connect() {
-        if (client.isConnected() || connecting) {
-            return;
-        }
-        connecting = true;
-        CompletableFuture.supplyAsync(client::connect).thenAccept(ok -> enqueue(() -> {
-            connecting = false;
-            if (ok) {
-                // The external controller is in charge from now on.
-                setDemoActive(false);
-            }
-        }));
-    }
-
-    private void setDemoActive(boolean active) {
-        if (active && client.isConnected()) {
-            LOG.info("Demo controller is not available while connected to a controller");
-            return;
-        }
-        demoActive = active;
-        if (active) {
-            demoController.reset();
-        }
-    }
-
-    private void setAllLights(LightState state) {
-        demoActive = false;
-        lights.values().forEach(light -> light.setState(state));
-    }
-
-    private void applyControllerUpdate(LightUpdate update) {
-        if (lights.containsKey(update.lightId())) {
-            setLight(update.lightId(), update.state());
-        } else {
-            LOG.fine(() -> "Controller switched unknown light " + update.lightId());
-        }
-    }
-
-    private void setLight(int id, LightState state) {
-        TrafficLight light = lights.get(id);
-        if (light != null) {
-            light.setState(state);
-        }
-    }
-
-    private void setUpKeys() {
-        inputManager.addMapping(CONNECT, new KeyTrigger(KeyInput.KEY_SPACE));
-        inputManager.addMapping(TOGGLE_DEMO, new KeyTrigger(KeyInput.KEY_L));
-        inputManager.addMapping(ALL_GREEN, new KeyTrigger(KeyInput.KEY_G));
-        inputManager.addMapping(ALL_RED, new KeyTrigger(KeyInput.KEY_R));
-        inputManager.addListener(this, CONNECT, TOGGLE_DEMO, ALL_GREEN, ALL_RED);
-    }
-
-    private void setUpHud() {
-        hud = new BitmapText(guiFont);
-        hud.setSize(guiFont.getCharSet().getRenderedSize());
-        hud.setColor(ColorRGBA.White);
-        hud.setLocalTranslation(10f, cam.getHeight() - 10f, 0f);
-        guiNode.attachChild(hud);
-    }
-
-    private String statusText() {
-        String lightsMode;
-        if (client.isConnected()) {
-            lightsMode = "controller at " + client.describe();
-        } else if (connecting) {
-            lightsMode = "connecting to " + client.describe() + "...";
-        } else if (demoActive) {
-            lightsMode = "built-in demo cycle";
-        } else {
-            lightsMode = "manual";
-        }
-        long waiting = vehicles.stream().filter(Vehicle::isWaiting).count();
-        return String.format(
-                "Time %d s   On the road %d (waiting %d)   Finished %d%n"
-                        + "Lights: %s%n"
-                        + "[Space] connect  [L] demo lights  [G] all green  [R] all red  "
-                        + "[WASD/Q/Z + mouse drag] camera",
-                (int) elapsed, vehicles.size(), waiting, finishedCount, lightsMode);
+        super.destroy();
     }
 }

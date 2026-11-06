@@ -1,77 +1,125 @@
 package simplifiedsimulator;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.Set;
+import simplifiedsimulator.control.SignalControllers;
+import simplifiedsimulator.render.CameraRig;
+import simplifiedsimulator.render.RenderQuality;
 
 /**
  * Command line options of the simulator.
  *
- * @param host      host name of the traffic light controller
- * @param port      TCP port of the traffic light controller
- * @param scenario  built-in scenario name ({@code small}, {@code medium}, {@code large})
- *                  or a path to a scenario file
- * @param connect   connect to the controller on start-up instead of waiting for Space
- * @param demo      start with the built-in demo light controller
- * @param headless  run without a window (useful for testing a controller)
- * @param duration  stop after this many seconds; 0 runs until the window is closed
- * @param recordTo  if not {@code null}, start the route recorder instead of the
- *                  simulation and save recorded routes to this file
+ * @param controller  signal controller: {@code actuated}, {@code fixed} or {@code external}
+ * @param host        host name of an external traffic light controller
+ * @param port        TCP port of an external traffic light controller
+ * @param start       time of day the simulation starts, in seconds after midnight
+ * @param date        date used for the position of the sun
+ * @param speed       simulation speed relative to real time
+ * @param demandScale factor applied to all traffic volumes
+ * @param demandFile  CSV file with traffic volumes per route, or {@code null} for the built-in estimates
+ * @param seed        random seed; the same seed gives the same traffic
+ * @param quality     graphics quality
+ * @param headless    run without a window and print the results
+ * @param duration    stop after this many simulated seconds; 0 runs until the window is closed
+ * @param csv         write statistics to this file (headless mode), or {@code null}
+ * @param camera      initial camera viewpoint
+ * @param screenshot  save a screenshot to this file after {@code duration} seconds and exit, or {@code null}
  */
 public record SimulatorConfig(
+        String controller,
         String host,
         int port,
-        String scenario,
-        boolean connect,
-        boolean demo,
+        double start,
+        LocalDate date,
+        double speed,
+        double demandScale,
+        Path demandFile,
+        long seed,
+        RenderQuality quality,
         boolean headless,
-        int duration,
-        Path recordTo) {
+        double duration,
+        Path csv,
+        CameraRig.Preset camera,
+        Path screenshot) {
 
     public static final String DEFAULT_HOST = "localhost";
     public static final int DEFAULT_PORT = 1337;
-    public static final String DEFAULT_SCENARIO = "large";
-    public static final Set<String> BUILT_IN_SCENARIOS = Set.of("small", "medium", "large");
 
     public static final String USAGE = """
             Usage: simplified-simulator [options]
 
-              --host <name>        controller host (default: localhost)
-              --port <number>      controller port (default: 1337)
-              --scenario <name>    small, medium, large or a path to a scenario XML file
-                                   (default: large)
-              --connect            connect to the controller on start-up
-              --demo               use the built-in fixed-time light controller
-              --headless           run without opening a window
-              --duration <sec>     stop after the given number of seconds
-              --record <file>      draw a new route on the map and save it to <file>
+            Simulation
+              --controller <name>  actuated (default), fixed or external
+              --start <HH:MM>      time of day to start at (default 07:30)
+              --speed <factor>     simulation speed, 1 = real time (default 1)
+              --scale <factor>     multiply all traffic volumes (default 1)
+              --demand <file.csv>  traffic volumes per route (default: built-in estimates)
+              --seed <number>      random seed; the same seed gives the same traffic (default 1)
+
+            External traffic light controller
+              --host <name>        controller host (default localhost)
+              --port <number>      controller port (default 1337)
+
+            Display
+              --quality <level>    high (default), medium or low
+              --date <YYYY-MM-DD>  date for the position of the sun (default today)
+              --camera <view>      overview, birds_eye, street_west, street_east,
+                                   street_north or street_south
+
+            Batch use
+              --headless           run without a window and print the results
+              --duration <sec>     stop after this many simulated seconds
+              --csv <file>         with --headless: write statistics per movement
+              --screenshot <file>  render, save a PNG after --duration seconds and exit
+
               --help               show this help
             """;
 
     public SimulatorConfig {
+        Objects.requireNonNull(controller, "controller");
         Objects.requireNonNull(host, "host");
-        Objects.requireNonNull(scenario, "scenario");
-        if (port < 1 || port > 65535) {
-            throw new IllegalArgumentException("Port must be between 1 and 65535, got " + port);
-        }
-        if (duration < 0) {
-            throw new IllegalArgumentException("Duration must not be negative, got " + duration);
+        Objects.requireNonNull(date, "date");
+        Objects.requireNonNull(quality, "quality");
+        Objects.requireNonNull(camera, "camera");
+        if (!SignalControllers.NAMES.contains(controller)) {
+            throw new IllegalArgumentException("Unknown controller '" + controller + "', expected one of "
+                    + String.join(", ", SignalControllers.NAMES));
         }
         if (host.isBlank()) {
             throw new IllegalArgumentException("Host must not be empty");
         }
-        if (recordTo != null && headless) {
-            throw new IllegalArgumentException("--record needs a window and cannot be used with --headless");
+        if (port < 1 || port > 65535) {
+            throw new IllegalArgumentException("Port must be between 1 and 65535, got " + port);
+        }
+        if (start < 0 || start >= 24 * 3600) {
+            throw new IllegalArgumentException("Start time must be between 00:00 and 23:59");
+        }
+        if (!(speed > 0) || speed > 64) {
+            throw new IllegalArgumentException("Speed must be more than 0 and at most 64, got " + speed);
+        }
+        if (!(demandScale >= 0) || demandScale > 5) {
+            throw new IllegalArgumentException("Scale must be between 0 and 5, got " + demandScale);
+        }
+        if (duration < 0) {
+            throw new IllegalArgumentException("Duration must not be negative, got " + duration);
+        }
+        if (headless && duration == 0) {
+            throw new IllegalArgumentException("--headless needs --duration");
+        }
+        if (headless && screenshot != null) {
+            throw new IllegalArgumentException("--screenshot needs a window and cannot be used with --headless");
+        }
+        if (csv != null && !headless) {
+            throw new IllegalArgumentException("--csv can only be used with --headless");
         }
     }
 
     public static SimulatorConfig defaults() {
-        return new SimulatorConfig(DEFAULT_HOST, DEFAULT_PORT, DEFAULT_SCENARIO, false, false, false, 0, null);
+        return new SimulatorConfig("actuated", DEFAULT_HOST, DEFAULT_PORT, 7.5 * 3600, LocalDate.now(), 1, 1, null, 1,
+                RenderQuality.HIGH, false, 0, null, CameraRig.Preset.OVERVIEW, null);
     }
 
     /**
@@ -81,47 +129,81 @@ public record SimulatorConfig(
      * @throws HelpRequested            if {@code --help} was given
      */
     public static SimulatorConfig parse(String... args) {
-        String host = DEFAULT_HOST;
-        int port = DEFAULT_PORT;
-        String scenario = DEFAULT_SCENARIO;
-        boolean connect = false;
-        boolean demo = false;
+        SimulatorConfig d = defaults();
+        String controller = d.controller;
+        String host = d.host;
+        int port = d.port;
+        double start = d.start;
+        LocalDate date = d.date;
+        double speed = d.speed;
+        double scale = d.demandScale;
+        Path demand = null;
+        long seed = d.seed;
+        RenderQuality quality = d.quality;
         boolean headless = false;
-        int duration = 0;
-        Path recordTo = null;
+        double duration = 0;
+        Path csv = null;
+        CameraRig.Preset camera = d.camera;
+        Path screenshot = null;
 
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
             switch (arg) {
+                case "--controller" -> controller = value(args, ++i, arg).toLowerCase(Locale.ROOT);
                 case "--host" -> host = value(args, ++i, arg);
-                case "--port" -> port = intValue(args, ++i, arg);
-                case "--scenario" -> scenario = value(args, ++i, arg);
-                case "--connect" -> connect = true;
-                case "--demo" -> demo = true;
+                case "--port" -> port = (int) number(args, ++i, arg);
+                case "--start" -> start = parseTime(value(args, ++i, arg));
+                case "--date" -> date = parseDate(value(args, ++i, arg));
+                case "--speed" -> speed = number(args, ++i, arg);
+                case "--scale" -> scale = number(args, ++i, arg);
+                case "--demand" -> demand = Path.of(value(args, ++i, arg));
+                case "--seed" -> seed = (long) number(args, ++i, arg);
+                case "--quality" -> quality = parseEnum(RenderQuality.class, value(args, ++i, arg), arg);
                 case "--headless" -> headless = true;
-                case "--duration" -> duration = intValue(args, ++i, arg);
-                case "--record" -> recordTo = Path.of(value(args, ++i, arg));
+                case "--duration" -> duration = number(args, ++i, arg);
+                case "--csv" -> csv = Path.of(value(args, ++i, arg));
+                case "--camera" -> camera = parseEnum(CameraRig.Preset.class, value(args, ++i, arg), arg);
+                case "--screenshot" -> screenshot = Path.of(value(args, ++i, arg));
                 case "--help", "-h" -> throw new HelpRequested();
                 default -> throw new IllegalArgumentException("Unknown option: " + arg);
             }
         }
-        return new SimulatorConfig(host, port, scenario, connect, demo, headless, duration, recordTo);
+        return new SimulatorConfig(controller, host, port, start, date, speed, scale, demand, seed, quality, headless,
+                duration, csv, camera, screenshot);
     }
 
-    /** Opens the configured scenario, either from the classpath or from disk. */
-    public InputStream openScenario() {
-        String name = scenario.toLowerCase(Locale.ROOT);
-        if (BUILT_IN_SCENARIOS.contains(name)) {
-            InputStream in = SimulatorConfig.class.getResourceAsStream("/scenarios/" + name + ".xml");
-            if (in == null) {
-                throw new IllegalStateException("Built-in scenario " + name + " is missing from the classpath");
-            }
-            return in;
-        }
+    /** Parses {@code HH:MM} or {@code HH:MM:SS} into seconds after midnight. */
+    static double parseTime(String text) {
+        String[] parts = text.split(":");
         try {
-            return Files.newInputStream(Path.of(scenario));
-        } catch (IOException e) {
-            throw new UncheckedIOException("Cannot open scenario file " + scenario, e);
+            if (parts.length < 2 || parts.length > 3) {
+                throw new NumberFormatException();
+            }
+            int h = Integer.parseInt(parts[0]);
+            int m = Integer.parseInt(parts[1]);
+            int s = parts.length == 3 ? Integer.parseInt(parts[2]) : 0;
+            if (h < 0 || h > 23 || m < 0 || m > 59 || s < 0 || s > 59) {
+                throw new NumberFormatException();
+            }
+            return h * 3600 + m * 60 + s;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid time '" + text + "', expected HH:MM", e);
+        }
+    }
+
+    private static LocalDate parseDate(String text) {
+        try {
+            return LocalDate.parse(text);
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("Invalid date '" + text + "', expected YYYY-MM-DD", e);
+        }
+    }
+
+    private static <E extends Enum<E>> E parseEnum(Class<E> type, String text, String option) {
+        try {
+            return Enum.valueOf(type, text.toUpperCase(Locale.ROOT).replace('-', '_'));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid value '" + text + "' for " + option, e);
         }
     }
 
@@ -132,16 +214,16 @@ public record SimulatorConfig(
         return args[index];
     }
 
-    private static int intValue(String[] args, int index, String option) {
-        String value = value(args, index, option);
+    private static double number(String[] args, int index, String option) {
+        String text = value(args, index, option);
         try {
-            return Integer.parseInt(value);
+            return Double.parseDouble(text);
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Value for " + option + " must be a number, got '" + value + "'", e);
+            throw new IllegalArgumentException("Invalid number '" + text + "' for " + option, e);
         }
     }
 
-    /** Signals that the user asked for the usage text. */
+    /** Thrown by {@link #parse} when the user asked for help. */
     public static final class HelpRequested extends RuntimeException {
         private static final long serialVersionUID = 1L;
 

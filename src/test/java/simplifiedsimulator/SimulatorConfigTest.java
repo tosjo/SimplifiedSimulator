@@ -1,72 +1,67 @@
 package simplifiedsimulator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import simplifiedsimulator.render.CameraRig;
+import simplifiedsimulator.render.RenderQuality;
 
 class SimulatorConfigTest {
 
     @Test
-    void usesDefaultsWithoutArguments() {
-        assertEquals(SimulatorConfig.defaults(), SimulatorConfig.parse());
+    void defaults() {
+        SimulatorConfig c = SimulatorConfig.parse();
+        assertEquals("actuated", c.controller());
+        assertEquals(7.5 * 3600, c.start());
+        assertEquals(1, c.speed());
+        assertEquals(RenderQuality.HIGH, c.quality());
+        assertEquals(CameraRig.Preset.OVERVIEW, c.camera());
     }
 
     @Test
     void parsesAllOptions() {
-        SimulatorConfig config = SimulatorConfig.parse(
-                "--host", "10.0.0.5", "--port", "4000", "--scenario", "small",
-                "--connect", "--demo", "--headless", "--duration", "30");
-
-        assertEquals(new SimulatorConfig("10.0.0.5", 4000, "small", true, true, true, 30, null), config);
+        SimulatorConfig c = SimulatorConfig.parse("--controller", "FIXED", "--start", "17:15", "--speed", "4",
+                "--scale", "1.3", "--seed", "7", "--quality", "low", "--camera", "street-west", "--host", "ctrl",
+                "--port", "4000", "--date", "2026-06-21");
+        assertEquals("fixed", c.controller());
+        assertEquals(17 * 3600 + 15 * 60, c.start());
+        assertEquals(4, c.speed());
+        assertEquals(1.3, c.demandScale());
+        assertEquals(7, c.seed());
+        assertEquals(RenderQuality.LOW, c.quality());
+        assertEquals(CameraRig.Preset.STREET_WEST, c.camera());
+        assertEquals("ctrl", c.host());
+        assertEquals(4000, c.port());
+        assertEquals(2026, c.date().getYear());
     }
 
     @Test
-    void parsesRecordOption() {
-        assertEquals(Path.of("new-route.txt"), SimulatorConfig.parse("--record", "new-route.txt").recordTo());
-        assertThrows(IllegalArgumentException.class,
-                () -> SimulatorConfig.parse("--record", "new-route.txt", "--headless"));
+    void headlessNeedsDuration() {
+        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--headless"));
+        SimulatorConfig c = SimulatorConfig.parse("--headless", "--duration", "60", "--csv", "out.csv");
+        assertTrue(c.headless());
+        assertEquals(Path.of("out.csv"), c.csv());
     }
 
     @Test
-    void rejectsInvalidArguments() {
-        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--port"));
-        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--port", "abc"));
+    void rejectsBadInput() {
+        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--controller", "magic"));
+        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--start", "25:00"));
+        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--speed", "0"));
         assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--port", "70000"));
-        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--duration", "-1"));
-        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--host", " "));
-        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--fast"));
-    }
-
-    @Test
-    void signalsHelp() {
+        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--csv", "x.csv"));
+        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--speed"));
+        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parse("--bogus"));
         assertThrows(SimulatorConfig.HelpRequested.class, () -> SimulatorConfig.parse("--help"));
     }
 
     @Test
-    void opensBuiltInScenarioCaseInsensitively() throws Exception {
-        try (InputStream in = SimulatorConfig.parse("--scenario", "Medium").openScenario()) {
-            assertNotNull(in);
-        }
-    }
-
-    @Test
-    void opensScenarioFromFile(@TempDir Path dir) throws Exception {
-        Path file = Files.writeString(dir.resolve("custom.xml"), "<Data/>");
-        try (InputStream in = SimulatorConfig.parse("--scenario", file.toString()).openScenario()) {
-            assertEquals("<Data/>", new String(in.readAllBytes()));
-        }
-    }
-
-    @Test
-    void reportsMissingScenarioFile(@TempDir Path dir) {
-        SimulatorConfig config = SimulatorConfig.parse("--scenario", dir.resolve("nope.xml").toString());
-        assertThrows(UncheckedIOException.class, config::openScenario);
+    void parsesTimes() {
+        assertEquals(0, SimulatorConfig.parseTime("00:00"));
+        assertEquals(23 * 3600 + 59 * 60 + 30, SimulatorConfig.parseTime("23:59:30"));
+        assertThrows(IllegalArgumentException.class, () -> SimulatorConfig.parseTime("7"));
     }
 }

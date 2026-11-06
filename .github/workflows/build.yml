@@ -22,4 +22,7 @@ jobs:
         run: ./gradlew build
 
       - name: Headless smoke run
-        run: ./gradlew run --args="--headless --demo --scenario small --duration 20"
+        run: ./gradlew run --args="--headless --duration 600"
+
+      - name: Compare controllers
+        run: ./gradlew batch --args="--seeds 1 --duration 1200"
