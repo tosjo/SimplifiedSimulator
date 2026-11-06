@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. The project follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-11-06
+
+### Added
+- Controller duel: `--duel <a>,<b>` shows two controllers side by side on the same
+  traffic, with cameras locked together and a live scoreboard (vehicle delay, stops, bus,
+  cyclist and pedestrian delay, vehicles through, queue, safety). Any two of `actuated`,
+  `fixed` and `external`; two external controllers use `--port` and `--port` + 1.
+- `X` in a duel saves both sides' statistics in one CSV with a `side` column.
+
+### Changed
+- The camera's aspect ratio follows its view port, and the renderer can draw into any
+  view port (needed for the split screen; the single view is unchanged).
+
 ## [1.1.0] - 2026-11-06
 
 ### Added

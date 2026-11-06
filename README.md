@@ -79,8 +79,38 @@ standalone copy with start scripts in `build/install/simplified-simulator/`.
 | `--camera <view>` | `overview` | `overview`, `birds_eye`, `street_west`, `street_east`, `street_north`, `street_south` |
 | `--headless --duration <sec>` | | Run without a window and print the results (`--csv <file>` to save them) |
 | `--screenshot <file> --duration <sec>` | | Simulate, save one picture and exit |
+| `--duel <a>,<b>` | | Two controllers side by side on the same traffic (see below) |
 
 ## Comparing controllers
+
+### Controller duel
+
+![Vehicle actuated against fixed time on the same traffic](docs/app-duel.jpg)
+
+`--duel` shows two controllers side by side, on exactly the same traffic: both sides get
+the same arrivals from the seed, and one clock advances both by the same steps. The
+camera of the right half follows the left one, so you always look at the same spot.
+
+```sh
+./gradlew run --args="--duel actuated,fixed"
+./gradlew run --args="--duel actuated,external"   # against your own controller
+```
+
+The scoreboard at the top shows who leads on vehicle delay, and compares stops, delay
+for buses, cyclists and pedestrians, vehicles through and the queue right now; the better
+value is green. Each side shows its safety record, in red as soon as anything unsafe
+happens. Speed, pause and traffic keys work on both sides at once, `R` reconnects the
+external controllers and `X` saves both sides' statistics in one CSV. Clicking a road user
+and switching controllers are off, since the sides have different road users and a
+switch would spoil the score.
+
+Two external controllers listen on `--port` and the next port (1337 and 1338 by default),
+for example two copies of the Python controller started with `--port 1337` and
+`--port 1338`. With an external controller neither side gets the usual warm-up, so both
+start from an empty crossing. A duel draws the city twice, so it starts at medium quality;
+`--quality high` overrides that.
+
+### Batch runner
 
 The batch runner simulates without graphics, about ten seconds per simulated hour:
 
