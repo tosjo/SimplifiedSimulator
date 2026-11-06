@@ -66,6 +66,15 @@ public final class CameraRig extends BaseAppState implements ActionListener, Ana
     private static final String[] KEYS = {"Forward", "Back", "StrafeLeft", "StrafeRight", "Rise", "Sink", "Fast",
         "ToggleFly", "ToggleDriver", "StopFollow"};
     private static final float EYE = 1.7f;
+    /**
+     * jME reports one mouse wheel notch as 1.2 (GLFW's 1.0, times 120, divided by 100), so a
+     * linear factor such as {@code 1 + amount * k} is lopsided: big enough to feel on the way
+     * out, it collapses the distance on the way in. An exponential step is the same size in both
+     * directions: about 15% per notch.
+     */
+    private static final float ZOOM_RATE = 0.12f;
+    /** Metres the free camera moves per unit of wheel, about 10 m per notch. */
+    private static final float FLY_ZOOM_STEP = 8f;
 
     private final Function<Long, Optional<Pose>> agentPoses;
     private final ToDoubleFunction<Long> agentLengths;
@@ -432,11 +441,21 @@ public final class CameraRig extends BaseAppState implements ActionListener, Ana
 
     private void zoom(float amount) {
         if (mode == Mode.ORBIT) {
-            distance *= 1 + amount * 0.8f;
+            distance = zoomedDistance(distance, amount);
             applyOrbit();
         } else if (mode == Mode.FLY) {
-            flyPosition.addLocal(cam.getDirection().mult(-amount * 60f));
+            flyPosition.addLocal(cam.getDirection().mult(-flyStep(amount)));
             applyFly();
         }
+    }
+
+    /** Orbit distance after turning the wheel by {@code amount} (positive is out). */
+    static float zoomedDistance(float distance, float amount) {
+        return distance * FastMath.exp(amount * ZOOM_RATE);
+    }
+
+    /** Metres the free camera moves back for a wheel turn of {@code amount} (negative is forward). */
+    static float flyStep(float amount) {
+        return amount * FLY_ZOOM_STEP;
     }
 }
