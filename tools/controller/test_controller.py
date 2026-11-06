@@ -183,6 +183,19 @@ class ProtocolTest(unittest.TestCase):
             with self.subTest(bad=bad):
                 self.assertIsNone(c.parse_sensor(bad))
 
+    def test_encodes_a_name_message_with_terminator(self):
+        raw = c.encode_name("Smart")
+        self.assertTrue(raw.endswith(b"\0"))
+        self.assertEqual({"controllername": {"name": "Smart"}}, json.loads(raw[:-1]))
+
+    def test_every_controller_has_a_short_plain_name(self):
+        import original2014
+        import smart
+        names = [c.Controller.NAME, original2014.Original2014Controller.NAME, smart.SmartController.NAME]
+        self.assertEqual(len(names), len(set(names)), "names tell the controllers apart")
+        for name in names:
+            self.assertTrue(0 < len(name) <= 20 and name.isascii(), name)
+
     def test_encodes_a_light_message_with_terminator(self):
         raw = c.encode_light(2, c.GREEN)
         self.assertTrue(raw.endswith(b"\0"))
@@ -204,7 +217,9 @@ class ServerTest(unittest.TestCase):
                 sim.sendall(b'{"sensorstate":{"id":2}}\0garbage\0')
                 while not any(m == {"lightstate": {"id": 2, "state": 2}} for m in received):
                     received.extend(json.loads(m) for m in framer.feed(sim.recv(4096)))
-                startup = received[:len(c.INTERGREEN)]
+                self.assertEqual({"controllername": {"name": "Python controller"}}, received[0],
+                                 "the controller says who it is first")
+                startup = received[1:1 + len(c.INTERGREEN)]
                 self.assertTrue(all(m["lightstate"]["state"] == c.RED for m in startup))
             finally:
                 sim.close()

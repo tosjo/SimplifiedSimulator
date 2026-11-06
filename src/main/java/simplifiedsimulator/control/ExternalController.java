@@ -37,6 +37,8 @@ public final class ExternalController implements SignalController {
     private ControllerClient client;
     private ControlContext ctx;
     private volatile boolean connecting;
+    /** The name the controller announced, if any. */
+    private volatile String announcedName;
 
     public ExternalController(String host, int port) {
         this.host = host;
@@ -45,7 +47,8 @@ public final class ExternalController implements SignalController {
 
     @Override
     public String name() {
-        return "External controller";
+        String announced = announcedName;
+        return announced != null ? announced : "External controller";
     }
 
     @Override
@@ -54,7 +57,7 @@ public final class ExternalController implements SignalController {
         for (SignalGroup g : context.network().signalGroups()) {
             byNumber.put(g.number(), g);
         }
-        client = new ControllerClient(host, port, incoming::add);
+        client = new ControllerClient(host, port, incoming::add, name -> announcedName = name);
         connect();
     }
 

@@ -10,6 +10,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -30,15 +31,24 @@ public final class ControllerClient implements AutoCloseable {
     private final String host;
     private final int port;
     private final Consumer<LightUpdate> listener;
+    private final Consumer<String> nameListener;
 
     private Socket socket;
     private Writer out;
     private volatile boolean connected;
 
     public ControllerClient(String host, int port, Consumer<LightUpdate> listener) {
+        this(host, port, listener, name -> { });
+    }
+
+    /**
+     * @param nameListener gets the name the controller announces, on the reading thread
+     */
+    public ControllerClient(String host, int port, Consumer<LightUpdate> listener, Consumer<String> nameListener) {
         this.host = Objects.requireNonNull(host, "host");
         this.port = port;
         this.listener = Objects.requireNonNull(listener, "listener");
+        this.nameListener = Objects.requireNonNull(nameListener, "nameListener");
     }
 
     /**
@@ -124,13 +134,18 @@ public final class ControllerClient implements AutoCloseable {
         if (message.isBlank()) {
             return;
         }
-        ProtocolCodec.decodeLight(message).ifPresentOrElse(update -> {
-            try {
-                listener.accept(update);
-            } catch (RuntimeException e) {
-                LOG.log(Level.WARNING, "Error while handling " + message, e);
-            }
-        }, () -> LOG.warning(() -> "Ignoring unrecognised message: " + message));
+        Optional<LightUpdate> light = ProtocolCodec.decodeLight(message);
+        Optional<String> name = light.isPresent() ? Optional.empty() : ProtocolCodec.decodeName(message);
+        if (light.isEmpty() && name.isEmpty()) {
+            LOG.warning(() -> "Ignoring unrecognised message: " + message);
+            return;
+        }
+        try {
+            light.ifPresent(listener);
+            name.ifPresent(nameListener);
+        } catch (RuntimeException e) {
+            LOG.log(Level.WARNING, "Error while handling " + message, e);
+        }
     }
 
     @Override

@@ -57,6 +57,8 @@ MAX_GREEN = {g: MAX_BY_KIND[k] for g, k in KIND.items()}
 class SmartController:
     """Same interface as the other controllers (see shared.py)."""
 
+    NAME = "Smart"
+
     def __init__(self, now, intergreen=INTERGREEN):
         self.intergreen = intergreen
         self.state = {g: RED for g in intergreen}

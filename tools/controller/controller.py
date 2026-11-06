@@ -24,8 +24,8 @@ Only the Python standard library is used (Python 3.8 or newer).
 import sys
 
 from shared import (AMBER_STATE, GREEN, INTERGREEN, PEDESTRIANS, RED, STATE_NAMES,  # noqa: F401 - re-exported
-                    Framer, argument_parser, check_plan, encode_light, format_groups, log, open_server,
-                    parse_sensor, run_server, serve_session, validate)
+                    Framer, argument_parser, check_plan, encode_light, encode_name, format_groups, log,
+                    open_server, parse_sensor, run_server, serve_session, validate)
 
 # --------------------------------------------------------------------------------------
 # Settings
@@ -59,6 +59,8 @@ class Controller:
     It starts as if every light had just turned red, so it is safe whatever the simulator
     showed before it connected.
     """
+
+    NAME = "Python controller"
 
     def __init__(self, now, phases=PHASES, intergreen=INTERGREEN, fixed=False):
         check_plan(phases, intergreen)

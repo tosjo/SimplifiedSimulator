@@ -56,4 +56,31 @@ class ExternalControllerTest {
             external.close();
         }
     }
+
+    @Test
+    void takesTheNameTheControllerAnnounces() throws Exception {
+        try (ServerSocket server = new ServerSocket(0)) {
+            CompletableFuture<Void> controller = CompletableFuture.runAsync(() -> {
+                try (Socket s = server.accept()) {
+                    OutputStream out = s.getOutputStream();
+                    out.write("{\"controllername\":{\"name\":\"Smart\"}}\0".getBytes(StandardCharsets.UTF_8));
+                    out.flush();
+                    Thread.sleep(1000);
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            });
+            ExternalController external = new ExternalController("localhost", server.getLocalPort());
+            assertEquals("External controller", external.name());
+            Simulation sim = Simulation.createDefault();
+            sim.setController(external);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (!external.name().equals("Smart") && System.nanoTime() < deadline) {
+                Thread.sleep(10);
+            }
+            assertEquals("Smart", external.name());
+            external.close();
+            controller.get(5, TimeUnit.SECONDS);
+        }
+    }
 }

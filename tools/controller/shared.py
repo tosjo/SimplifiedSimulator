@@ -1,7 +1,8 @@
 """What every external controller for SimplifiedSimulator needs: the crossing's conflict
 table, the protocol, and the TCP server the simulator connects to.
 
-A controller is any object with these methods:
+A controller is any object with a NAME (up to 20 plain characters, shown in the simulator)
+and these methods:
 
     startup_messages()     -> [(group, state)] to send when the simulator connects
     detector(group, now)   a road user reached a detector of `group`
@@ -109,6 +110,11 @@ def encode_light(group, state):
     return json.dumps({"lightstate": {"id": group, "state": state}}).encode("utf-8") + b"\0"
 
 
+def encode_name(name):
+    """Tells the simulator who we are; older simulators ignore it."""
+    return json.dumps({"controllername": {"name": name}}).encode("utf-8") + b"\0"
+
+
 # --------------------------------------------------------------------------------------
 # Server: the simulator connects to us
 # --------------------------------------------------------------------------------------
@@ -132,7 +138,8 @@ def serve_session(conn, clock, controller, verbose, tick=0.05):
     """Runs one session with a connected simulator until it disconnects."""
     conn.settimeout(tick)
     framer = Framer()
-    conn.sendall(b"".join(encode_light(g, s) for g, s in controller.startup_messages()))
+    conn.sendall(encode_name(controller.NAME)
+                 + b"".join(encode_light(g, s) for g, s in controller.startup_messages()))
     while True:
         try:
             data = conn.recv(4096)

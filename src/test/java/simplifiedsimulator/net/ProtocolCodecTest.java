@@ -48,4 +48,21 @@ class ProtocolCodecTest {
             assertEquals(state, LightState.fromCode(state.code()));
         }
     }
+
+    @Test
+    void decodesTheNameAControllerAnnounces() {
+        assertEquals(java.util.Optional.of("Smart"), ProtocolCodec.decodeName("{\"controllername\":{\"name\":\"Smart\"}}"));
+        assertEquals(java.util.Optional.of("2014 controller"),
+                ProtocolCodec.decodeName("{\"ControllerName\":{\"Name\":\"  2014 controller \"}}"));
+    }
+
+    @Test
+    void ignoresNamesThatAreMissingTooLongOrNotPlainText() {
+        for (String bad : new String[] {"{\"controllername\":{}}", "{\"controllername\":{\"name\":\"\"}}",
+                "{\"controllername\":{\"name\":\"a name that is much too long\"}}",
+                "{\"controllername\":{\"name\":\"café\"}}", "{\"controllername\":{\"name\":7}}",
+                "{\"controllername\":\"x\"}", "{\"lightstate\":{\"id\":2,\"state\":2}}", "not json", "[]"}) {
+            assertTrue(ProtocolCodec.decodeName(bad).isEmpty(), bad);
+        }
+    }
 }

@@ -215,8 +215,15 @@ To switch a group, the controller sends this, with `state` `0` for red, `1` for 
 {"lightstate":{"id":2,"state":2}}
 ```
 
+A controller may also say who it is, once, so the simulator shows its name (1 to 20 plain
+characters) instead of "External controller", for example on the duel scoreboard:
+
+```json
+{"controllername":{"name":"Smart"}}
+```
+
 This is the protocol of the original 2014 project, so its controllers still work, with the
-new group numbers.
+new group numbers; the name message is optional.
 
 ## Project layout
 

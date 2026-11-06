@@ -63,6 +63,8 @@ class Light:
 class Original2014Controller:
     """The 2014 controller on today's crossing. Same interface as the other controllers."""
 
+    NAME = "2014 controller"
+
     def __init__(self, now, intergreen=INTERGREEN):
         self.intergreen = intergreen
         self.lights = [Light(g) for g in ORDER if g in intergreen]
