@@ -49,6 +49,19 @@ class NetworkTest {
     }
 
     @Test
+    void routePathFollowsTheLanesWithoutDoublingBack() {
+        for (Route route : network.routes()) {
+            Polyline path = route.path();
+            assertEquals(route.length(), path.length(), 1.0, route.id());
+            for (double s = 0; s + 2 < path.length(); s += 2) {
+                double turn = Math.abs(Math.atan2(Math.sin(path.headingAt(s + 2) - path.headingAt(s)),
+                        Math.cos(path.headingAt(s + 2) - path.headingAt(s))));
+                assertTrue(turn < Math.toRadians(120), route.id() + " turns back at " + s);
+            }
+        }
+    }
+
+    @Test
     void polylineArcLength() {
         Polyline p = new Polyline(java.util.List.of(new Vec2(0, 0), new Vec2(10, 0), new Vec2(10, 10)));
         assertEquals(20, p.length(), 1e-9);

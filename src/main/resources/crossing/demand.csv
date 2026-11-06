@@ -1,0 +1,42 @@
+# Traffic demand at the Harlingerstraatweg / Douwe Kalmaleane / Slauerhoffweg crossing,
+# Leeuwarden, in road users per hour during the busiest (peak) hour.
+#
+# These are ESTIMATES, not counts. No public counts exist for this municipal crossing;
+# the values are based on its role in the network: the Harlingerstraatweg is the main road
+# into Leeuwarden from the west (N31 / Harlingen), the Douwe Kalmaleane and Slauerhoffweg
+# are distributor roads to the Westeinde, Bilgaard and Cambuurplein areas. The totals were
+# checked against the queues visible on the PDOK aerial photos and against the capacity of
+# the crossing in the simulation: at these volumes the morning peak is busy but not gridlocked.
+# If you have real counts (for example from the gemeente Leeuwarden), put them in a copy of
+# this file and start the simulator with --demand <file>.
+#
+# Columns: route id (see network.json), road users per peak hour, description
+route,perHour,description
+W1_L,140,Harlingerstraatweg from the west turning left into the Douwe Kalmaleane
+W2_T,350,Harlingerstraatweg from the west straight on (left through lane)
+W3_T,350,Harlingerstraatweg from the west straight on (right through lane)
+W4_R,180,Harlingerstraatweg from the west turning right into the Slauerhoffweg
+Wb_T,6,Buses on the bus lane from the west towards the city centre
+E1_L,150,Harlingerstraatweg from the city turning left into the Slauerhoffweg
+E2_T,300,Harlingerstraatweg from the city straight on (left through lane)
+E3_T,300,Harlingerstraatweg from the city straight on (right through lane)
+Eb_T,6,Buses on the bus lane from the city towards Harlingen
+E5_R,130,Harlingerstraatweg from the city turning right into the Douwe Kalmaleane
+N1_L,150,Douwe Kalmaleane turning left towards the city centre
+N2_T,110,Douwe Kalmaleane straight on into the Slauerhoffweg
+N3_R,120,Douwe Kalmaleane turning right towards Harlingen
+S1_L,150,Slauerhoffweg turning left towards Harlingen
+S2_T,110,Slauerhoffweg straight on into the Douwe Kalmaleane
+S3_R,180,Slauerhoffweg turning right towards the city centre
+BN_fwd,70,Cyclists crossing the Douwe Kalmaleane heading east
+BN_rev,70,Cyclists crossing the Douwe Kalmaleane heading west
+BS_fwd,90,Cyclists crossing the Slauerhoffweg heading east
+BS_rev,90,Cyclists crossing the Slauerhoffweg heading west
+BE_fwd,100,Cyclists crossing the Harlingerstraatweg heading north
+BE_rev,100,Cyclists crossing the Harlingerstraatweg heading south
+PN_fwd,15,Pedestrians crossing the Douwe Kalmaleane heading east
+PN_rev,15,Pedestrians crossing the Douwe Kalmaleane heading west
+PS_fwd,20,Pedestrians crossing the Slauerhoffweg heading east
+PS_rev,20,Pedestrians crossing the Slauerhoffweg heading west
+PE_fwd,20,Pedestrians crossing the Harlingerstraatweg heading north
+PE_rev,20,Pedestrians crossing the Harlingerstraatweg heading south
