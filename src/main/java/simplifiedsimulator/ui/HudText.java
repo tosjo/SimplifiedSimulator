@@ -99,6 +99,23 @@ final class HudText {
         return sb.toString().stripTrailing();
     }
 
+    /** The duel scoreboard: who leads, then one row per measure with the better value in green. */
+    static String duelTable(DuelScore.Side a, DuelScore.Side b) {
+        String headline = DuelScore.headline(a, b);
+        String colour = headline.contains(" leads: ") ? GREEN : headline.startsWith("warming") ? GREY : WHITE;
+        StringBuilder sb = new StringBuilder(colour).append(headline).append('\n');
+        sb.append(GREY).append("left  ").append(WHITE).append(a.name()).append(GREY).append("   vs   right  ")
+                .append(WHITE).append(b.name()).append('\n');
+        for (DuelScore.Row r : DuelScore.rows(a, b)) {
+            sb.append(GREY).append(String.format(Locale.ROOT, "%-18s", r.label()))
+                    .append(r.better() == DuelScore.Better.A ? GREEN : WHITE).append(String.format(Locale.ROOT, "%8s", r.a()))
+                    .append("   ")
+                    .append(r.better() == DuelScore.Better.B ? GREEN : WHITE).append(String.format(Locale.ROOT, "%8s", r.b()))
+                    .append('\n');
+        }
+        return sb.toString().stripTrailing();
+    }
+
     /** A readable description of a route, for example "West (from Harlingen), left turn". */
     static String describe(Route route) {
         String from = APPROACH_NAMES.getOrDefault(route.approach(), route.approach());
@@ -183,4 +200,19 @@ final class HudText {
 
             Display
               T  signal timeline   G  statistics   H  this help   Esc  quit""";
+
+    static final String HELP_DUEL = """
+            Camera (both sides follow it)
+              drag              rotate            right-drag / WASD   move
+              wheel             zoom              F                   fly mode
+              1-6               viewpoints
+
+            Duel (keys work on both sides at once)
+              Space / P         pause             + / -               faster / slower
+              [ / ]             less / more traffic
+              R                 reconnect the external controllers
+              X                 save statistics   F12                 screenshot
+
+            Display
+              H  this help   Esc  quit""";
 }

@@ -1,5 +1,6 @@
 package simplifiedsimulator;
 
+import com.jme3.app.SimpleApplication;
 import com.jme3.system.AppSettings;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -52,6 +53,11 @@ public final class Main {
             return;
         }
 
+        if (config.isDuel()) {
+            startDuel(config);
+            return;
+        }
+
         Simulation simulation;
         try {
             simulation = createSimulation(config);
@@ -71,8 +77,35 @@ public final class Main {
         startWindow(simulation, config);
     }
 
+    private static void startDuel(SimulatorConfig config) {
+        Simulation left;
+        Simulation right;
+        // both sides get the same start; an external controller cannot be warmed up, so then neither is
+        boolean warmUp = !config.duel().contains("external");
+        try {
+            left = createSimulation(config, config.controllerFor(0), config.portFor(0), warmUp);
+            right = createSimulation(config, config.controllerFor(1), config.portFor(1), warmUp);
+        } catch (IOException | IllegalArgumentException e) {
+            System.err.println("Cannot start the simulation: " + e.getMessage());
+            System.exit(1);
+            return;
+        }
+        if (config.screenshot() != null) {
+            left.run(config.duration());
+            right.run(config.duration());
+        }
+        start(new DuelSimulator(config, left, right), config, "Controller duel - Harlingerstraatweg, Leeuwarden");
+    }
+
     /** Builds the simulation, warms it up and attaches the chosen controller. */
     static Simulation createSimulation(SimulatorConfig config) throws IOException {
+        // an external controller has to see the simulation from its first second
+        return createSimulation(config, config.controller(), config.port(), !"external".equals(config.controller()));
+    }
+
+    /** Builds a simulation with the given controller; both sides of a duel get the same traffic from the seed. */
+    static Simulation createSimulation(SimulatorConfig config, String controller, int port, boolean warmUp)
+            throws IOException {
         Network network = Network.loadDefault();
         DemandModel demand = config.demandFile() == null ? DemandModel.loadDefault() : DemandModel.load(config.demandFile());
         double start = (config.start() - WARM_UP + 86_400) % 86_400;
@@ -82,9 +115,8 @@ public final class Main {
                 .withSeed(config.seed())
                 .withStartTimeOfDay(start);
         Simulation simulation = new Simulation(network, options);
-        simulation.setController(SignalControllers.create(config.controller(), config.host(), config.port()));
-        // an external controller has to see the simulation from its first second
-        if (!"external".equals(config.controller())) {
+        simulation.setController(SignalControllers.create(controller, config.host(), port));
+        if (warmUp) {
             simulation.run(WARM_UP);
             simulation.resetStatistics();
         }
@@ -92,9 +124,12 @@ public final class Main {
     }
 
     private static void startWindow(Simulation simulation, SimulatorConfig config) {
-        SimplifiedSimulator app = new SimplifiedSimulator(config, simulation);
+        start(new SimplifiedSimulator(config, simulation), config, "Simplified Simulator - Harlingerstraatweg, Leeuwarden");
+    }
+
+    private static void start(SimpleApplication app, SimulatorConfig config, String title) {
         AppSettings settings = new AppSettings(true);
-        settings.setTitle("Simplified Simulator - Harlingerstraatweg, Leeuwarden");
+        settings.setTitle(title);
         settings.setResolution(1600, 900);
         settings.setResizable(true);
         settings.setSamples(config.screenshot() != null ? 1 : 4);
