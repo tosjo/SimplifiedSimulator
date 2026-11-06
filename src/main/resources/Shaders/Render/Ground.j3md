@@ -1,0 +1,27 @@
+MaterialDef Ground {
+    MaterialParameters {
+        Texture2D FineMap
+        Texture2D MidMap
+        Texture2D WideMap
+        // half sizes of the areas covered by each texture, metres
+        Float FineHalf : 80.0
+        Float MidHalf : 300.0
+        Float WideHalf : 1500.0
+        Color OuterColor
+        Color AmbientColor
+        Color SunColor
+        Vector3 SunDirection
+        Color FogColor
+        Float FogDensity : 0.0004
+        Float DetailStrength : 0.06
+    }
+    Technique {
+        VertexShader GLSL300 GLSL150 GLSL100: Shaders/Render/Ground.vert
+        FragmentShader GLSL300 GLSL150 GLSL100: Shaders/Render/Ground.frag
+        WorldParameters {
+            WorldViewProjectionMatrix
+            WorldMatrix
+            CameraPosition
+        }
+    }
+}

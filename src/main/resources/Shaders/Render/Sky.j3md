@@ -1,0 +1,27 @@
+MaterialDef Sky {
+    MaterialParameters {
+        Vector3 SunDirection
+        Color ZenithColor
+        Color HorizonColor
+        Color GroundColor
+        Color SunColor
+        Float SunGlow : 1.0
+        Float CloudCover : 0.4
+        Color CloudColor
+        Float Time : 0.0
+        Float StarBrightness : 0.0
+    }
+    Technique {
+        VertexShader GLSL300 GLSL150 GLSL100: Shaders/Render/Sky.vert
+        FragmentShader GLSL300 GLSL150 GLSL100: Shaders/Render/Sky.frag
+        WorldParameters {
+            ViewMatrix
+            ProjectionMatrix
+        }
+        RenderState {
+            DepthWrite Off
+            DepthFunc LessOrEqual
+            FaceCull Off
+        }
+    }
+}
